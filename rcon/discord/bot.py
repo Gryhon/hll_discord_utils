@@ -10,7 +10,6 @@ from rcon.discord.balance import Balance
 from rcon.discord.votemap import VoteMap
 from rcon.discord.autolevel import AutoLevel
 from rcon.discord.comfort import Comfort
-from rcon.discord.inappropriatename import InappropriateName
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -54,10 +53,6 @@ class MainBot(commands.Bot):
         if (config.get("rcon", 0, "comfort_functions", 0, "enabled")):
             logger.info ("Start comfort functions")
             await self.add_cog(Comfort(self)) 
-
-        if (config.get("rcon", 0, "inappropriate_name", 0, "enabled")):
-            logger.info ("Start inappropriate name functions")
-            await self.add_cog(InappropriateName(self)) 
             
         await self.tree.sync()
         logger.info ("Slash commands have been synced.")
