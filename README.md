@@ -204,7 +204,7 @@ cd /opt
 
 Use git to clone the repository:
 ``` shell
-sudo git clone https://github.com/Gryhon/hll_discord_helper.git
+sudo git clone https://github.com/Gryhon/hll_discord_utils.git
 ```
 
 Get in the newly created folder:
