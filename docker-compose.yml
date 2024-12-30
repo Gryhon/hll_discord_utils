@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    volumes:
+      - .:/app  # Mounte den aktuellen Ordner ins Container-Verzeichnis
+    environment:
+      - PYTHONUNBUFFERED=1  # Stelle sicher, dass Python-Ausgaben sofort angezeigt werden
+
+    restart: unless-stopped
+
