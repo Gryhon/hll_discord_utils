@@ -25,7 +25,7 @@ Connect with us on Discord for feedback, troubleshooting, and update information
 - [Installation](#installation)
   - [Limitation](#1-limitaion)
   - [Precondition](#2-precondition)
-  - [Get hll_dicord_helper](#3-get-the-hll_discord_helper-from-github)
+  - [Get hll_dicord_utils](#3-get-the-hll_discord_utils-from-github)
   - [Config file](#4-edit-the-config-file)
   - [Start Docker container](#5-start-the-docker-contaner)
   - [Update the repository](#6-update-the-the-repository)
@@ -156,7 +156,7 @@ The software is intended to run in a Docker container. I recommend that you run 
 ### 1. Limitaion
 
 > [!Important]
-> `hll_discord_helper` is currently supporting only one Server per instance!
+> `hll_discord_utils` is currently supporting only one Server per instance!
 
 [Jump to the top](#content)
 
@@ -195,7 +195,7 @@ The software is intended to run in a Docker container. I recommend that you run 
 
 [Jump to the top](#content)
 
-### 3. Get the hll_discord_helper from GitHub
+### 3. Get the hll_discord_utils from GitHub
 
 Change folder to `opt`:
 ``` shell
@@ -209,7 +209,7 @@ sudo git clone https://github.com/Gryhon/hll_discord_utils.git
 
 Get in the newly created folder:
 ``` shell
-cd hll_discord_helper
+cd hll_discord_utils
 sudo git checkout <last release>
 ```
 [Jump to the top](#content)
