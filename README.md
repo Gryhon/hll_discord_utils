@@ -238,9 +238,9 @@ Create a seperate CRCON user. All messages send by the Bot will be in the audit 
     "rcon": [
         {
         "server_number": 1,                 // Currently space holder for multiple server support
-        "api_url": "",                      // Base URL to your CRCON server e.g. https://best.clan.ever or http://127.0.0.1:7010
+        "api_url": "",                      // Base URL to your CRCON server e.g. https://best.clan.ever or http://127.0.0.1:8010
         "stats_url": "",                    // URL to your CRCON status page
-        "bearer_token": "",                 // Bearer token you can create at e.g. https://best.clan.ever/admin
+        "bearer_token": "",                 // Bearer token (Django API Key) you can create at e.g. https://best.clan.ever/admin
         "discord_token": "",                // Your discord developer token for this bot -> https://discord.com/developers/docs/intro
         "log_level": "INFO",                // I recommend not to change this. 
 
