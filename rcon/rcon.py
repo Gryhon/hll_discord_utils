@@ -193,7 +193,6 @@ async def get_Player_Profile (payload):
     else:
         return None 
 
-
 async def get_In_Game_Players ():
     data = await get_Data ("/api/get_team_view")
 

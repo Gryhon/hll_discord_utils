@@ -9,6 +9,7 @@ __pycache__/
 
 # MacOS
 .DS_Store
+sync.sh
 
 # Project
 config.json

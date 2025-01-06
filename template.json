@@ -46,10 +46,6 @@
                 "vote_channel_id": 0,
                 "reminder": 20,
                 "vote_header": "Vote for the nextmap on <your discord>",
-                "default_map_filter":[{
-                    "enviroment": [],
-                    "game_mode": []
-                }],
                 "map_pool":[{
                     "day": 0,
                     "night": 0,
