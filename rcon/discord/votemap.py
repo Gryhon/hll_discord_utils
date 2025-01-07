@@ -3,6 +3,7 @@ import logging
 import asyncio
 import random
 import time
+import re
 import rcon.model as model
 import rcon.rcon as rcon
 from typing import List
@@ -726,9 +727,16 @@ class VoteMap(commands.Cog, DiscordBase):
         player_id = self.select_T17_Voter_Registration (user_id)
 
         if player_id == None:
-            self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, 0, 0)
-                                
-            await interaction.response.send_message("You are now registered", ephemeral=True)
+
+            # verify that that ingame_name is a T17 ID
+            if bool (re.fullmatch(r"[0-9a-fA-F]{32}", ingame_name)) == False:
+                await interaction.response.send_message('''Something went wrong, please select your name from the\n'''
+                                                        '''list and do not add or remove any characters,\n'''
+                                                        '''after the selection.''', ephemeral=True)
+            else:
+                self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, 0, 0)
+                await interaction.response.send_message("You are now registered", ephemeral=True)
+
         else:
             await interaction.response.send_message("You are already registered. If it was't you, please contacht @Techsupport!", ephemeral=True)
 
