@@ -45,7 +45,7 @@
                 "dectivate_vote": 0,
                 "vote_channel_id": 0,
                 "reminder": 20,
-                "show_reminder": true,
+                "stealth_vote": false,
                 "vote_header": "Vote for the nextmap on <your discord>",
                 "default_map_filter":[{
                     "enviroment": [],
