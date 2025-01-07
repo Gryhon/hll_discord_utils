@@ -182,16 +182,34 @@ The software is intended to run in a Docker container. I recommend that you run 
 > [!Important]
 > Check the access to the discord commands carefully. 
 > Ensure that only the people who are supposed to have access to the Discord commands actually have it! 
-
-- You must register yourself at https://discord.com/developers/docs/intro to get a bot token to run the bot in your discord server
-- The discord bot needs the following access on your discord server
-  - View Channels
-  - Create Private Threads 
-  - Create Polls
-  - Send Messages
-  - Manage Threads
-  - Send Messages in Threads
-  - Read Message History
+#### Discord Setup
+*Written assuming you do not know discord bots and are setting this up for private deployment to your server*
+1. Register yourself at https://discord.com/developers/docs/intro
+2. Create a new application
+3. Instalation Settings
+  * Instalation Context Uncheck User Installs and Leave Guid Install Checked
+  * Install Link  Set to None
+4. Bot Settings
+  * Give Bot a Name
+  * Uncheck Public Bots
+  * Uncheck *if checked* Require Oauth 2 Code Grant
+  * Check: Presense Intent, Server Membrs Intent, Message Contentent Intent
+5. Reset Token (Scroll Up)
+  * Save this token as you will need it later
+6. Install Bot
+  * Go to OAuth2 and Scroll to OAuth2 URL Generator
+  * In Scopes Select
+    * application.commands (2nd column)
+    * bot (3rd column)
+  * In Bot Permisions Slect
+    * View Channels
+    * Create Private Threads 
+    * Create Polls
+    * Send Messages
+    * Manage Threads
+    * Send Messages in Threads
+    * Read Message History
+  * Take Generated Link and Open it in a new window to install
 
 [Jump to the top](#content)
 
