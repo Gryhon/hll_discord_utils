@@ -572,7 +572,6 @@ class VoteMap(commands.Cog, DiscordBase):
 
                 # reminder
                 elif self.game_active and self.vote_active:
-
                     if not self.last_execution:
                         self.last_execution = time.time()
 
@@ -580,7 +579,8 @@ class VoteMap(commands.Cog, DiscordBase):
 
                     if (current_time - self.last_execution) >= (config.get("rcon", 0, "map_vote", 0, "reminder") * 60):
                         logger.info("Send reminder")
-                        await self.send_Vote_Message (True)
+                        if not config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
+                            await self.send_Vote_Message(True)
                         self.last_execution = current_time
 
                 if not self.send_seeding_message:
