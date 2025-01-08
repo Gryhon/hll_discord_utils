@@ -436,32 +436,33 @@ class VoteMap(commands.Cog, DiscordBase):
 
     async def start_Vote (self):
         try:
-            logger.debug(f"Starting vote with vote_msg_id: {self.vote_msg_id}")
-            self.Maps = await self.get_Maps_To_Vote()
-            logger.debug(f"Got maps to vote: {[m.pretty_name for m in self.Maps.maps] if self.Maps else None}")
-            self.vote_active = await self.check_Active_Vote()
-            logger.debug(f"Check active vote result: {self.vote_active}")
+            self.Maps = await self.get_Maps_To_Vote ()
+            self.vote_active = await self.check_Active_Vote ()
             
             if not self.vote_active:
-                topic = "Vote for the next map:"
-                await self.get_Game_State()
-                
-                poll = discord.Poll(question=discord.PollMedia(topic, emoji=None), duration=timedelta(hours=2), multiple=False)
-                
+                topic = "Vote for the next map:"                
+
+                await self.get_Game_State ()
+
+                poll = discord.Poll (question=discord.PollMedia(topic, emoji=None), duration=timedelta(hours=2), multiple=False)
+
                 for item in self.Maps.maps:
-                    logger.debug(f"Adding map to vote: {item.pretty_name}")
-                    poll.add_answer(text=item.pretty_name, emoji=None)
-                
+                    logger.debug ("Add map to vote: " + str (item.pretty_name))
+                    poll.add_answer (text=item.pretty_name, emoji=None)
+
+                logger.debug ("Poll: " + str (poll))
+
                 self.vote_msg = await self.vote_channel.send(poll=poll)
                 self.vote_msg_id = self.vote_msg.id
-                logger.debug(f"Created new vote message with ID: {self.vote_msg_id}")
-                self.insert_Map_Vote(self.vote_msg.id, self.game_start)
-                
-                await self.send_Vote_Message()
+                self.insert_Map_Vote (self.vote_msg.id, self.game_start)
+
+                logger.info ("Vote message ID: " + str (self.vote_msg.id))
+
+                await self.send_Vote_Message ()
+
             else:
-                logger.debug(f"Attempting to fetch existing vote message with ID: {self.vote_msg_id}")
-                self.vote_msg = await self.vote_channel.fetch_message(self.vote_msg_id)
-                
+                self.vote_msg = await self.vote_channel.fetch_message (self.vote_msg_id)
+
             self.vote_active = True
 
         except discord.NotFound:
