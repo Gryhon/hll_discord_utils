@@ -299,6 +299,7 @@ Create a seperate CRCON user. All messages send by the Bot will be in the audit 
                 "dectivate_vote": 50,        // minimum amount of playeer to deactivate the map vote function
                 "vote_channel_id": 0,        // discord channel id where the vote should happens
                 "reminder": 20,              // time in minutes to remind the player to vote 
+                "stealth_vote": false,        // if true a message will only be sent to discord and not in game
                 "vote_header": "Vote for the nextmap on <your discord>", // add here your header for the vote window ingame
                 "default_map_filter":[{      // map names and enviroment can be found here https://gist.github.com/timraay/5634d85eab552b5dfafb9fd61273dc52
                                              // ensure that all items are !! lower case !!  
