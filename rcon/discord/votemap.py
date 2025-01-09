@@ -504,9 +504,6 @@ class VoteMap(commands.Cog, DiscordBase):
             Text = ""
             voters = None
 
-            if config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
-                return
-
             if reminder and self.game_start:
                 voters = self.select_T17_Voter (self.game_start)
 
@@ -525,7 +522,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     data = None
                     data = {"player_id": str (player.player_id) , "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str (Text) }   
                         
-                    if data:
+                    if data and config.get("rcon", 0, "map_vote", 0, "stealth_vote") == False:
                         if not (config.get("rcon", 0, "map_vote", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
                             logger.debug("Vote message: " + str (data)) 
                             await rcon.send_Player_Message (data)
