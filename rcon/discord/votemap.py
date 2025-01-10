@@ -3,6 +3,7 @@ import logging
 import asyncio
 import random
 import time
+import re
 import rcon.model as model
 import rcon.rcon as rcon
 from typing import List
@@ -438,7 +439,7 @@ class VoteMap(commands.Cog, DiscordBase):
         try:
             self.Maps = await self.get_Maps_To_Vote ()
             self.vote_active = await self.check_Active_Vote ()
-            
+
             if not self.vote_active:
                 topic = "Vote for the next map:"                
 
@@ -488,7 +489,7 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
             self.vote_active = False
             
-    async def get_user_name(self, user_id):
+    async def get_User_Name(self, user_id):
         try:
             user = await self.bot.fetch_user(user_id)
             return user.name
@@ -524,7 +525,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     data = None
                     data = {"player_id": str (player.player_id) , "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str (Text) }   
                         
-                    if data:
+                    if data and config.get("rcon", 0, "map_vote", 0, "stealth_vote") == False:
                         if not (config.get("rcon", 0, "map_vote", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
                             logger.debug("Vote message: " + str (data)) 
                             await rcon.send_Player_Message (data)
@@ -534,6 +535,33 @@ class VoteMap(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             
+    async def check_Origin_Map_Rotation (self):
+        try:
+            map_rotation = await rcon.get_Map_Rotation ()
+
+            if len (map_rotation.maps) > 1:
+                maps = "|".join(map.id for map in map_rotation.maps)
+
+                rotation = self.select_Key_Value ("Origin_Map_Rotation")
+
+                if rotation == None:
+                    self.insert_Key_Value ("Origin_Map_Rotation", maps)
+                    logger.info ("Insert origin map rotation")
+                else:
+                    set1 = set(maps.split("|"))
+                    set2 = set(rotation.split("|"))
+
+                    if set1 != set2:
+                        self.update_Key_Value ("Origin_Map_Rotation", maps)
+                        logger.info ("Update origin map rotation")
+
+            if (self.seeded == False and len (map_rotation.maps) == 1) or (self.do_map_vote == False and len (map_rotation.maps) == 1):
+                rotation = self.select_Key_Value ("Origin_Map_Rotation")
+                await self.set_Map (rotation.split("|"))
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+   
     async def do_Map_Vote (self):
         try:
             self.do_map_vote = True
@@ -545,12 +573,16 @@ class VoteMap(commands.Cog, DiscordBase):
                 if server_status.current_players >= config.get("rcon", 0, "map_vote", 0, "activate_vote") and not self.seeded:
                     logger.info (f"Server reached {config.get("rcon", 0, "map_vote", 0, "activate_vote")} player and vote map is active!")
                     self.seeded = True
+                    await self.check_Origin_Map_Rotation ()
 
                 elif server_status.current_players <= config.get("rcon", 0, "map_vote", 0, "dectivate_vote"):
                     if self.seeded:
                         logger.info (f"Server drops below or equal to {config.get("rcon", 0, "map_vote", 0, "dectivate_vote")} player and vote map is now deactive!")
-                    self.seeded = False
+                    
+                    await self.check_Origin_Map_Rotation ()
 
+                    self.seeded = False
+                    
             if self.seeded:
                 if self.game_active and not self.vote_active:
                     logger.info ("Vote is being started...")
@@ -643,13 +675,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
             if self.seeded:
                 await self.stop_Vote ()
-
-                default_maps = await rcon.get_Maps ()
-                enviroment = config.get("rcon", 0, "map_vote", 0, "default_map_filter", 0, "enviroment")
-                game_mode = config.get("rcon", 0, "map_vote", 0, "default_map_filter", 0, "game_mode")
-
-                maps = default_maps.get_Map_Names (enviroment, game_mode)
-                await self.set_Map (maps)
+                await self.check_Origin_Map_Rotation ()
 
             await self.clear_All_Messages (None, False)                
             await self.send_Pause_Message ()
@@ -728,9 +754,16 @@ class VoteMap(commands.Cog, DiscordBase):
         player_id = self.select_T17_Voter_Registration (user_id)
 
         if player_id == None:
-            self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, 0, 0)
-                                
-            await interaction.response.send_message("You are now registered", ephemeral=True)
+
+            # verify that that ingame_name is a T17 ID
+            if bool (re.fullmatch(r"[0-9a-fA-F]{32}", ingame_name)) == False:
+                await interaction.response.send_message('''Something went wrong, please select your name from the\n'''
+                                                        '''list and do not add or remove any characters,\n'''
+                                                        '''after the selection.''', ephemeral=True)
+            else:
+                self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, 0, 0)
+                await interaction.response.send_message("You are now registered", ephemeral=True)
+
         else:
             await interaction.response.send_message("You are already registered. If it was't you, please contacht @Techsupport!", ephemeral=True)
 
@@ -770,7 +803,7 @@ class VoteMap(commands.Cog, DiscordBase):
         try:
             if (self.vote_msg_id == payload.message_id) and (self.game_active and self.vote_active):
                 answer = payload.answer_id
-                name = await self.get_user_name (payload.user_id)
+                name = await self.get_User_Name (payload.user_id)
 
                 logger.info (name + " removed vote for " + self.vote_msg.poll.answers[answer-1].text)
                 self.deleter_Voter (self.game_start, name, self.vote_msg.poll.answers[answer-1].text)
