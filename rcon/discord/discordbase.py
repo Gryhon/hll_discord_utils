@@ -20,6 +20,7 @@ class DiscordBase:
         self.create_Voter_Table()
         self.create_Voter_Register_Table()
         self.create_Inappropriate_Name_Table()
+        self.create_Key_Value()
 
     def create_Message_Table(self):
         # Creates the table if it does not yet exist
@@ -129,6 +130,19 @@ class DiscordBase:
 
         self.conn.commit()  
 
+    def create_Key_Value(self):
+        # Creates the table if it does not yet exist
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS key_value (
+            keyval_seqno INTEGER PRIMARY KEY AUTOINCREMENT,
+            keyval_key TEXT UNIQUE,
+            keyval_value TEXT,
+            keyval_datetime INTEGER
+        )
+        ''')
+
+        self.conn.commit()  
+
     def column_exists(self, table_name, column_name):
         try:
             self.cursor.execute(f"PRAGMA table_info({table_name});")
@@ -181,6 +195,32 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
+    def select_Key_Value(self, key):
+        try:
+            # Loads the key value from the database
+            self.cursor.execute('SELECT keyval_value FROM key_value WHERE keyval_key = (?) ORDER BY keyval_seqno DESC LIMIT 1', (key,))
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def insert_Key_Value(self, key, value):
+        try:
+            # Insert the key value in the database
+            self.cursor.execute('INSERT INTO key_value (keyval_key, keyval_value, keyval_datetime) VALUES (?, ?, ?)', (key, value, int(time.time())))
+            self.conn.commit()  
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    def update_Key_Value(self, key, value):
+        try:
+            # Updates the key value in the database for a specific key
+            self.cursor.execute('UPDATE key_value SET keyval_value = ?, keyval_datetime = ? WHERE keyval_key = ?', (value, int(time.time()), key))
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")   
+
     def insert_Inappropriate_Name(self, player_id, player_name, decision, msg_id):
         try:
             # Insert the message ID in the database
@@ -213,7 +253,6 @@ class DiscordBase:
             logger.error(f"SQLite OperationalError: {e}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-
 
     def select_Inappropriate_Name(self, player_id):
         try:
