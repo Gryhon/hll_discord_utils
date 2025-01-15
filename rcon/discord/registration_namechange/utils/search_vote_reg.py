@@ -46,11 +46,14 @@ async def register_user(db_instance, user_name: str, user_id: int, nick_name: st
 async def get_player_name(ingame_name: str) -> Optional[str]:
     """Fetch the player's name from the game database."""
     try:
-        payload = {"player_id": ingame_name}
-        player_info = await rcon.get_Player_Info(payload)
+        # Use get_Player_History instead of get_Player_Info
+        payload = {"page_size": 1, "page": 1, "player_id": ingame_name}
+        result = await rcon.get_Player_History(payload)
+        player = result.get_Players_Name()
         
-        if player_info and player_info.name:
-            return player_info.name
+        if player and len(player) > 0:
+            # Return the most recent name
+            return ", ".join(player[0][1])
         return None
 
     except Exception as e:
