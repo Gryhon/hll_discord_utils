@@ -44,18 +44,8 @@ async def register_user(db_instance, user_name: str, user_id: int, nick_name: st
         return False, "An error occurred during registration"
 
 async def get_player_name(t17_id: str) -> Optional[str]:
-    """Fetch the player's current name from the game database using their T17 ID."""
+    """Fetch the player's most recent name from their history using their T17 ID."""
     try:
-        # First get current players list with this ID
-        result = await rcon.get_Players_By_Name({"steam_id_64": t17_id})
-        
-        if result and len(result) > 0:
-            # Player is currently in game, use their current name
-            current_name = result[0].get("name", "")
-            if current_name:
-                return current_name[:32]  # Discord nickname limit
-        
-        # If not in game, get their most recent name from history
         history_result = await rcon.get_Player_History({"player_id": t17_id})
         if history_result:
             players = history_result.get_Players_Name()
