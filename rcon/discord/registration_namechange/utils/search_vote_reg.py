@@ -50,8 +50,8 @@ async def get_player_name(t17_id: str) -> Optional[str]:
         if history_result:
             players = history_result.get_Players_Name()
             if players and len(players) > 0:
-                # Get most recent name from history
-                recent_name = ", ".join(players[0][1])
+                # Get most recent name and take only the first name before any comma
+                recent_name = players[0][1][0]  # Take first name from the array
                 return recent_name[:32]  # Discord nickname limit
                 
         return None
