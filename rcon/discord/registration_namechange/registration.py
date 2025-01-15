@@ -6,7 +6,7 @@ from typing import List
 from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
-from .utils.player_search_vote_reg import query_player_database, register_user
+from .utils.search_vote_reg import query_player_database, register_user
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
