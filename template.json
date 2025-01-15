@@ -64,6 +64,12 @@
                 "t17_number": {
                     "required": false,
                     "show": true
+                },
+                "clan_tag": {
+                    "show": true,
+                    "position": "prefix",
+                    "blocked_tags": ["ABC", "XYZ", "TEST"],
+                    "max_length": 4
                 }
             }
         }
