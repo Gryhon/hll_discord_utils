@@ -742,62 +742,6 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
             return None
     
-    @app_commands.command(name="voter_registration", description="Combine you Discord user with you T17 account")
-    @app_commands.describe(
-        ingame_name="Choose you in game user",
-    )
-    async def voter_registration(self, interaction: discord.Interaction, ingame_name: str):
-        user_name = interaction.user.name
-        user_id = interaction.user.id 
-        nick_name = interaction.guild.get_member(user_id).nick
-
-        player_id = self.select_T17_Voter_Registration (user_id)
-
-        if player_id == None:
-
-            # verify that that ingame_name is a T17 ID
-            if bool (re.fullmatch(r"[0-9a-fA-F]{32}", ingame_name)) == False:
-                await interaction.response.send_message('''Something went wrong, please select your name from the\n'''
-                                                        '''list and do not add or remove any characters,\n'''
-                                                        '''after the selection.''', ephemeral=True)
-            else:
-                self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, 0, 0)
-                await interaction.response.send_message("You are now registered", ephemeral=True)
-
-        else:
-            await interaction.response.send_message("You are already registered. If it was't you, please contacht @Techsupport!", ephemeral=True)
-
-    @voter_registration.autocomplete("ingame_name")
-    async def voter_autocomplete(self, interaction: discord.Interaction, player_name: str) -> List[app_commands.Choice[str]]:
-        try:
-            while self.in_Loop:
-                await asyncio.sleep (1)
-           
-            self.in_Loop = True
-            name = player_name
-            multi_array = None
-
-            if len (name) >= 2:
-                logger.info (f"Search query: {name.replace(" ", "%")}")
-
-                multi_array = await self.query_Player_Database(name.replace(" ", "%"))
-        
-            if multi_array is not None and len (multi_array) >= 1:
-                result = [
-                    app_commands.Choice(name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {", ".join(player[1])}"[:100], value=player[0])
-                    for player in multi_array
-                ]
-                self.in_Loop = False
-                return result
-            else:
-                self.in_Loop = False
-                return []
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.in_Loop = False
-            return []
-
     @commands.Cog.listener()
     async def on_raw_poll_vote_remove(self, payload):
         try:
