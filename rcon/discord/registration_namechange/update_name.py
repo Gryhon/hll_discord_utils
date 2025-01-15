@@ -5,7 +5,7 @@ from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
 from .utils.search_vote_reg import get_player_name
 from lib.config import config
-from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag
+from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -23,23 +23,29 @@ class UpdateName(commands.Cog, DiscordBase):
     )
     @app_commands.describe(
         t17_number="Your 4-digit T17 number (optional)" if not config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
-        clan_tag="Your clan tag (optional)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None
+        clan_tag="Your clan tag (optional)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
+        emojis="Your emojis (optional, max 3)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
     )
     async def update_name(
         self, 
         interaction: discord.Interaction,
         t17_number: str if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else Optional[str] = None,
-        clan_tag: Optional[str] = None
+        clan_tag: Optional[str] = None,
+        emojis: Optional[str] = None
     ):
         try:
-            # Validate T17 number
+            # Validate inputs
             is_valid, error_message = validate_t17_number(t17_number)
             if not is_valid:
                 await interaction.response.send_message(error_message, ephemeral=True)
                 return
 
-            # Validate clan tag
             is_valid, error_message = validate_clan_tag(clan_tag)
+            if not is_valid:
+                await interaction.response.send_message(error_message, ephemeral=True)
+                return
+
+            is_valid, error_message = validate_emojis(emojis)
             if not is_valid:
                 await interaction.response.send_message(error_message, ephemeral=True)
                 return
@@ -69,7 +75,7 @@ class UpdateName(commands.Cog, DiscordBase):
             # Update nickname
             try:
                 member = interaction.guild.get_member(interaction.user.id)
-                formatted_name = format_nickname(player_name, t17_number, clan_tag)
+                formatted_name = format_nickname(player_name, t17_number, clan_tag, emojis)
                 await member.edit(nick=formatted_name)
                 logger.info(f"Updated nickname for {interaction.user.name} to {formatted_name}")
                 await interaction.response.send_message(

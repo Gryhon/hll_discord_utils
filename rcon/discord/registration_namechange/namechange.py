@@ -8,7 +8,7 @@ from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
 from .utils.search_vote_reg import query_player_database, register_user, get_player_name
 from lib.config import config
-from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag
+from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -26,14 +26,16 @@ class NameChange(commands.Cog, DiscordBase):
     @app_commands.describe(
         ingame_name="Choose your in game user",
         t17_number="Your 4-digit T17 number (optional)" if not config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
-        clan_tag="Your clan tag (optional)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None
+        clan_tag="Your clan tag (optional)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
+        emojis="Your emojis (optional, max 3)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
     )
     async def namechange(
         self, 
         interaction: discord.Interaction, 
         ingame_name: str,
         t17_number: str if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else Optional[str] = None,
-        clan_tag: Optional[str] = None
+        clan_tag: Optional[str] = None,
+        emojis: Optional[str] = None
     ):
         if not self.enabled:
             await interaction.response.send_message("Name change functionality is currently disabled.", ephemeral=True)
@@ -48,6 +50,11 @@ class NameChange(commands.Cog, DiscordBase):
 
             # Validate clan tag
             is_valid, error_message = validate_clan_tag(clan_tag)
+            if not is_valid:
+                await interaction.response.send_message(error_message, ephemeral=True)
+                return
+
+            is_valid, error_message = validate_emojis(emojis)
             if not is_valid:
                 await interaction.response.send_message(error_message, ephemeral=True)
                 return
@@ -83,7 +90,7 @@ class NameChange(commands.Cog, DiscordBase):
             # Get and update nickname
             player_name = await get_player_name(ingame_name)
             if player_name:
-                formatted_name = format_nickname(player_name, t17_number, clan_tag)
+                formatted_name = format_nickname(player_name, t17_number, clan_tag, emojis)
                 try:
                     await member.edit(nick=formatted_name)
                     logger.info(f"Updated nickname for {interaction.user.name} to {formatted_name}")

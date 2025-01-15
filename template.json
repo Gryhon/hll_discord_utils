@@ -70,6 +70,10 @@
                     "position": "prefix",
                     "blocked_tags": ["ABC", "XYZ", "TEST"],
                     "max_length": 4
+                },
+                "emojis": {
+                    "show": true,
+                    "max_count": 3
                 }
             }
         }
