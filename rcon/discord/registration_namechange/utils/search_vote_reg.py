@@ -43,17 +43,27 @@ async def register_user(db_instance, user_name: str, user_id: int, nick_name: st
         logger.error(f"Unexpected error in register_user: {e}")
         return False, "An error occurred during registration"
 
-async def get_player_name(ingame_name: str) -> Optional[str]:
-    """Fetch the player's name from the game database."""
+async def get_player_name(t17_id: str) -> Optional[str]:
+    """Fetch the player's current name from the game database using their T17 ID."""
     try:
-        # Use get_Player_History instead of get_Player_Info
-        payload = {"page_size": 1, "page": 1, "player_id": ingame_name}
-        result = await rcon.get_Player_History(payload)
-        player = result.get_Players_Name()
+        # First get current players list with this ID
+        result = await rcon.get_Players_By_Name({"steam_id_64": t17_id})
         
-        if player and len(player) > 0:
-            # Return the most recent name
-            return ", ".join(player[0][1])
+        if result and len(result) > 0:
+            # Player is currently in game, use their current name
+            current_name = result[0].get("name", "")
+            if current_name:
+                return current_name[:32]  # Discord nickname limit
+        
+        # If not in game, get their most recent name from history
+        history_result = await rcon.get_Player_History({"player_id": t17_id})
+        if history_result:
+            players = history_result.get_Players_Name()
+            if players and len(players) > 0:
+                # Get most recent name from history
+                recent_name = ", ".join(players[0][1])
+                return recent_name[:32]  # Discord nickname limit
+                
         return None
 
     except Exception as e:
