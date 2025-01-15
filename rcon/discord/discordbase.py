@@ -409,3 +409,20 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None
+
+    def delete_T17_Voter_Registration(self, discord_user_id):
+        """Delete a user's registration from the database."""
+        try:
+            self.cursor.execute(
+                'DELETE FROM voter_register WHERE votreg_dis_user_id = ?',
+                (int(discord_user_id),)
+            )
+            self.conn.commit()
+            return True
+
+        except sqlite3.OperationalError as e:
+            logger.error(f"SQLite OperationalError: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
