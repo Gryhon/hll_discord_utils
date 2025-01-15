@@ -74,6 +74,20 @@
                 "emojis": {
                     "show": true,
                     "max_count": 3
+                },
+                "roles": {
+                    "registered": {
+                        "enabled": true,
+                        "role_id": "123456789"
+                    },
+                    "name_changed": {
+                        "enabled": true,
+                        "role_id": "987654321"
+                    }
+                },
+                "notifications": {
+                    "enabled": true,
+                    "channel_id": "123456789"
                 }
             }
         }

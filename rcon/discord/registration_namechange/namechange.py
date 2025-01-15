@@ -9,6 +9,8 @@ from rcon.discord.discordbase import DiscordBase
 from .utils.search_vote_reg import query_player_database, register_user, get_player_name
 from lib.config import config
 from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis
+from .utils.role_utils import handle_roles
+from .utils.message_utils import send_success_embed
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -93,11 +95,28 @@ class NameChange(commands.Cog, DiscordBase):
                 formatted_name = format_nickname(player_name, t17_number, clan_tag, emojis)
                 try:
                     await member.edit(nick=formatted_name)
-                    logger.info(f"Updated nickname for {interaction.user.name} to {formatted_name}")
-                    await interaction.response.send_message(
-                        f"Successfully registered and updated your nickname to {formatted_name}", 
-                        ephemeral=True
+                    
+                    # Assign role if configured
+                    error_msg = await handle_roles(member, 'name_changed')
+                    
+                    # Send success embed
+                    await send_success_embed(
+                        interaction.guild,
+                        interaction.user,
+                        'name_changed',
+                        formatted_name
                     )
+                    
+                    if error_msg:
+                        await interaction.response.send_message(
+                            f"Nickname updated successfully, but note: {error_msg}",
+                            ephemeral=True
+                        )
+                    else:
+                        await interaction.response.send_message(
+                            "Successfully updated your nickname!",
+                            ephemeral=True
+                        )
                 except discord.Forbidden:
                     logger.error(f"Failed to update nickname for {interaction.user.name} - insufficient permissions")
                     await interaction.response.send_message(
