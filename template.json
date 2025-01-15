@@ -58,6 +58,19 @@
                     "blacklist_maps":[],
                     "exclude_played_maps": 0
                 }]
+            }],
+            "name_change_registration": [{
+                "enabled": true,
+                "registered_role_id": 0,
+                "log_channel_id": 0,
+                "require_t17_number": false,
+                "show_t17_number": true,
+                "custom_emojis": true,
+                "show_clan_tag": true,
+                "clan_position": "suffix",
+                "hidden_clan_tags": ["BAD", "TOXIC"],
+                "max_emoji_count": 2
             }]
-    }]
+        }
+    ]
 }
