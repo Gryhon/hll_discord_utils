@@ -120,13 +120,13 @@ class NameEmoji(commands.Cog, DiscordBase):
                 await interaction.response.send_message(error, ephemeral=True)
                 return
 
-            # Update nickname with components - using the fetched player_name
+            # Update nickname with components
             success, formatted_name, error_message = await update_user_nickname(
                 self,
                 member,
-                player_name,  # Use the actual player name we just fetched
-                result[2],    # T17 number
-                result[1],    # Clan tag
+                player_name,
+                result[2],    # T17 number from registration
+                result[1],    # Clan tag from registration
                 emojis       # New emojis
             )
 
