@@ -64,12 +64,9 @@ class NameChange(commands.Cog, DiscordBase):
                 await interaction.response.send_message("Could not find your in-game name.", ephemeral=True)
                 return
 
-            # Get actual player name
-            player_name = await get_player_name(player_id)
-            if not player_name:
-                await interaction.response.send_message("Could not retrieve your player name.", ephemeral=True)
-                return
-
+            # Get actual player name (we already have it from the autocomplete)
+            player_name = ingame_name.split(" - ")[1] if " - " in ingame_name else ingame_name
+            
             # Check T17 number requirement
             t17_required = config.get("rcon", 0, "name_change_registration", "t17_number", "required", default=False)
             if t17_required and not t17_number:
