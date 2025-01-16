@@ -11,6 +11,7 @@ from lib.config import config
 from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, update_user_nickname
 from .utils.role_utils import handle_roles
 from .utils.message_utils import send_success_embed, handle_name_update_response
+import re
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -58,15 +59,23 @@ class NameChange(commands.Cog, DiscordBase):
                 )
                 return
 
-            # Get player info from database
-            player_id = await get_player_name(ingame_name)
-            if not player_id:
-                await interaction.response.send_message("Could not find your in-game name.", ephemeral=True)
+            # Get player info from database - the value from autocomplete is already the player_id
+            player_id = ingame_name  # The autocomplete Choice.value is the player_id
+            if not bool(re.fullmatch(r"[0-9a-fA-F]{32}", player_id)):
+                await interaction.response.send_message(
+                    '''Something went wrong, please select your name from the\n''' \
+                    '''list and do not add or remove any characters,\n''' \
+                    '''after the selection.''',
+                    ephemeral=True
+                )
                 return
 
-            # Get actual player name (we already have it from the autocomplete)
-            player_name = ingame_name.split(" - ")[1] if " - " in ingame_name else ingame_name
-            
+            # Get actual player name
+            player_name = await get_player_name(player_id)  # This will get the name from the ID
+            if not player_name:
+                await interaction.response.send_message("Could not retrieve your player name.", ephemeral=True)
+                return
+
             # Check T17 number requirement
             t17_required = config.get("rcon", 0, "name_change_registration", "t17_number", "required", default=False)
             if t17_required and not t17_number:
