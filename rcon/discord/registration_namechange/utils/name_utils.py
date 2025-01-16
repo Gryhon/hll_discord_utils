@@ -23,28 +23,28 @@ def validate_t17_number(t17_number: Optional[str]) -> Tuple[bool, Optional[str]]
     return True, None
 
 def validate_clan_tag(clan_tag: Optional[str]) -> Tuple[bool, Optional[str]]:
-    """Validate clan tag format and check against blocked tags."""
+    """Validate clan tag format and check against hidden tags."""
     if not clan_tag:
         return True, None
 
     try:
         if not config.get("rcon", 0, "name_change_registration", "clan_tag", "show", default=True):
-            return False, "Clan tags are not enabled."
+            return True, None  # Still valid, just won't be shown
 
+        # Get max length from config
         max_length = config.get("rcon", 0, "name_change_registration", "clan_tag", "max_length", default=4)
-        blocked_tags = config.get("rcon", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
-    except ValueError:
-        # If config isn't loaded, use defaults
-        max_length = 4
-        blocked_tags = []
-    
-    if len(clan_tag) > max_length:
-        return False, f"Clan tag must be {max_length} characters or less."
+        if len(clan_tag) > max_length:
+            return False, f"Clan tag must be {max_length} characters or less."
+
+        # Get hidden tags list
+        hidden_tags = config.get("rcon", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
         
-    if clan_tag.upper() in [tag.upper() for tag in blocked_tags]:
-        return False, "This clan tag is not allowed."
-        
-    return True, None
+        # Tag is valid but might be hidden
+        return True, None
+
+    except Exception as e:
+        logger.error(f"Error validating clan tag: {e}")
+        return False, "An error occurred while validating the clan tag."
 
 def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: Optional[str] = None, emojis: Optional[str] = None) -> str:
     """Format the nickname with optional T17 number and clan tag."""
@@ -52,12 +52,15 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
     
     # Format clan tag if provided and allowed
     if clan_tag and config.get("rcon", 0, "name_change_registration", "clan_tag", "show", default=True):
-        formatted_tag = f"[{clan_tag.upper()}]"
-        tag_position = config.get("rcon", 0, "name_change_registration", "clan_tag", "position", default="prefix")
-        
-        # Add prefix clan tag
-        if tag_position == "prefix":
-            result += formatted_tag
+        # Check if tag should be hidden
+        hidden_tags = config.get("rcon", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
+        if clan_tag.upper() not in [tag.upper() for tag in hidden_tags]:
+            formatted_tag = f"[{clan_tag.upper()}]"
+            tag_position = config.get("rcon", 0, "name_change_registration", "clan_tag", "position", default="prefix")
+            
+            # Add prefix clan tag
+            if tag_position == "prefix":
+                result += formatted_tag
     
     # Add base name
     result += base_name
@@ -66,13 +69,15 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
     if t17_number and config.get("rcon", 0, "name_change_registration", "t17_number", "show", default=True):
         result += f"#{t17_number}"
     
-    # Add suffix clan tag
+    # Add suffix clan tag if not hidden
     if clan_tag and config.get("rcon", 0, "name_change_registration", "clan_tag", "show", default=True):
-        tag_position = config.get("rcon", 0, "name_change_registration", "clan_tag", "position", default="prefix")
-        if tag_position == "suffix":
-            result += formatted_tag
+        hidden_tags = config.get("rcon", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
+        if clan_tag.upper() not in [tag.upper() for tag in hidden_tags]:
+            tag_position = config.get("rcon", 0, "name_change_registration", "clan_tag", "position", default="prefix")
+            if tag_position == "suffix":
+                result += formatted_tag
     
-    # Add emojis if provided and enabled - only unicode emojis are supported
+    # Add emojis if provided and enabled
     if emojis and config.get("rcon", 0, "name_change_registration", "emojis", "show", default=True):
         # Remove any custom emoji format attempts
         if '<:' in emojis:
