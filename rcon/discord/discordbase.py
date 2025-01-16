@@ -382,14 +382,26 @@ class DiscordBase:
             logger.error(f"Unexpected error: {e}")
 
     def insert_Voter_Registration(self, discord_user, discord_user_id, discord_nick, player_id, register_cnt, not_ingame_cnt, clan_tag=None, t17_number=None, emojis=None, display_format=None):
-        try:
-            self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', (str(discord_user), int(discord_user_id), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format))
-            self.conn.commit()  
+        max_retries = 3
+        retry_delay = 1  # seconds
+        
+        for attempt in range(max_retries):
+            try:
+                self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                    (str(discord_user), int(discord_user_id), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format))
+                self.conn.commit()
+                return True
 
-        except sqlite3.OperationalError as e:
-            logger.error(f"SQLite OperationalError: {e}")
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            except sqlite3.OperationalError as e:
+                if "database is locked" in str(e):
+                    if attempt < max_retries - 1:
+                        logger.warning(f"Database locked, retrying in {retry_delay} seconds... (attempt {attempt + 1}/{max_retries})")
+                        time.sleep(retry_delay)
+                        continue
+                logger.error(f"SQLite OperationalError after {max_retries} attempts: {e}")
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+            return False
 
     def select_T17_Voter_Registration(self, discord_user_id):
         try:

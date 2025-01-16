@@ -18,21 +18,27 @@ class NameEmoji(commands.Cog, DiscordBase):
         super().__init__()
         self.bot = bot
 
-    def validate_emojis(self, emojis: Optional[str]) -> Tuple[bool, Optional[str]]:
+    def validate_emojis(self, emojis: Optional[str]) -> Tuple[bool, str]:
         """Validate emoji input."""
         if not emojis:
-            return True, None
+            return True, "Emojis cleared successfully."
 
-        if not config.get("rcon", 0, "name_change_registration", "emojis", "show", default=True):
-            return False, "Emojis are not enabled."
+        # Check for custom Discord emojis
+        if '<:' in emojis or ':' in emojis:
+            return False, "Custom Discord emojis are not supported. Please use standard Unicode emojis only."
 
-        max_count = config.get("rcon", 0, "name_change_registration", "emojis", "max_count", default=3)
-        emoji_count = len(emojis.split())
+        # Split and count emojis
+        emoji_list = emojis.split()
+        if len(emoji_list) > 5:
+            return False, "Maximum 5 emojis allowed."
 
-        if emoji_count > max_count:
-            return False, f"Maximum {max_count} emojis allowed. Your emojis may be trimmed if they exceed the nickname length limit."
+        # Validate each emoji is a Unicode emoji
+        for emoji in emoji_list:
+            if not any(char in emoji for char in ('️', '⃣', '↔', '↕')):  # Common emoji modifiers
+                if not emoji.encode('utf-8').decode('utf-8'):  # Basic Unicode validation
+                    return False, f"Invalid emoji detected: {emoji}"
 
-        return True, None
+        return True, "Emojis validated successfully."
 
     def strip_emojis(self, name: str) -> str:
         """Remove emojis from the end of the name."""
@@ -67,10 +73,10 @@ class NameEmoji(commands.Cog, DiscordBase):
 
     @app_commands.command(
         name="name-emoji",
-        description="Update the emojis in your Discord nickname (up to 5)"
+        description="Update the emojis in your Discord nickname (up to 5 Unicode emojis)"
     )
     @app_commands.describe(
-        emojis="Paste your emojis with spaces between them"
+        emojis="Paste your Unicode emojis with spaces between them (no custom Discord emojis)"
     )
     async def name_emoji(
         self,
@@ -114,10 +120,10 @@ class NameEmoji(commands.Cog, DiscordBase):
                 return
 
             # Validate emojis
-            valid, error = self.validate_emojis(emojis)
+            valid, message = self.validate_emojis(emojis)
             if not valid:
-                logger.warning(f"Invalid emojis from {interaction.user.name}: {emojis}. Error: {error}")
-                await interaction.response.send_message(error, ephemeral=True)
+                logger.warning(f"Invalid emojis from {interaction.user.name}: {emojis}. Error: {message}")
+                await interaction.response.send_message(message, ephemeral=True)
                 return
 
             # Update nickname with components
