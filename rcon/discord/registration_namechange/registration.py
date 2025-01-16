@@ -23,11 +23,17 @@ class Registration(commands.Cog, DiscordBase):
     @app_commands.command(name="voter_registration", description="Combine your Discord user with your T17 account")
     @app_commands.describe(
         ingame_name="Choose your in game user",
+        vote_reminders="Would you like to receive vote reminders?"
     )
-    async def voter_registration(self, interaction: discord.Interaction, ingame_name: str):
+    async def voter_registration(
+        self, 
+        interaction: discord.Interaction, 
+        ingame_name: str,
+        vote_reminders: bool = True
+    ):
         try:
             # Check if feature is enabled
-            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+            if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
                 await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
                 return
 
@@ -36,7 +42,8 @@ class Registration(commands.Cog, DiscordBase):
                 interaction.user.name,
                 interaction.user.id,
                 interaction.guild.get_member(interaction.user.id).nick,
-                ingame_name
+                ingame_name,
+                1 if vote_reminders else 0  # Use 1/0 for the votereg_ask_reg_cnt field
             )
             
             if success:

@@ -5,6 +5,7 @@ from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
 from rcon.config import config
+from rcon.discord.registration_namechange.utils.search_vote_reg import get_registration_details, format_registration_info
 
 logger = logging.getLogger(__name__)
 
@@ -70,27 +71,21 @@ class Unregister(commands.Cog, DiscordBase):
         interaction: discord.Interaction,
         user: Optional[discord.Member] = None
     ):
+        """Check if a user is registered and display their registration details."""
         try:
             target_user = user or interaction.user
-            result = self.select_T17_Voter_Registration(target_user.id)
+            logger.info(f"Checking registration for user {target_user.name} (ID: {target_user.id})")
             
-            if result:
-                player_id, clan_tag, t17_number, emojis = result
-                components = []
-                if clan_tag: components.append(f"Clan: {clan_tag}")
-                if t17_number: components.append(f"T17#: {t17_number}")
-                if emojis: components.append(f"Emojis: {emojis}")
-                
-                info = f"User {target_user.name} is registered with T17 ID: {player_id}"
-                if components:
-                    info += f"\nComponents: {', '.join(components)}"
-                    
-                await interaction.response.send_message(info, ephemeral=True)
-            else:
+            result, error = await get_registration_details(self, target_user.id)
+            if error:
                 await interaction.response.send_message(
-                    f"User {target_user.name} is not registered.",
+                    f"User {target_user.name} is not registered." if "not registered" in error else error,
                     ephemeral=True
                 )
+                return
+                
+            info = await format_registration_info(target_user.name, result)
+            await interaction.response.send_message(info, ephemeral=True)
 
         except Exception as e:
             logger.error(f"Error in check_registration: {e}")
@@ -103,7 +98,7 @@ class Unregister(commands.Cog, DiscordBase):
     async def unregister(self, interaction: discord.Interaction):
         try:
             # Check if feature is enabled
-            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+            if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
                 await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
                 return
 

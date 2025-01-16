@@ -9,7 +9,7 @@ def validate_t17_number(t17_number: Optional[str]) -> Tuple[bool, Optional[str]]
     """Validate T17 number format."""
     try:
         if not t17_number:
-            if config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False):
+            if config.get("rcon", 0, "name_change_registration", "t17_number", "required", default=False):
                 return False, "T17 number is required. Please provide your 4-digit T17 number."
             return True, None
     except ValueError:
@@ -28,11 +28,11 @@ def validate_clan_tag(clan_tag: Optional[str]) -> Tuple[bool, Optional[str]]:
         return True, None
 
     try:
-        if not config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
+        if not config.get("rcon", 0, "name_change_registration", "clan_tag", "show", default=True):
             return False, "Clan tags are not enabled."
 
-        max_length = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "max_length", default=4)
-        blocked_tags = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
+        max_length = config.get("rcon", 0, "name_change_registration", "clan_tag", "max_length", default=4)
+        blocked_tags = config.get("rcon", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
     except ValueError:
         # If config isn't loaded, use defaults
         max_length = 4
@@ -46,30 +46,14 @@ def validate_clan_tag(clan_tag: Optional[str]) -> Tuple[bool, Optional[str]]:
         
     return True, None
 
-def validate_emojis(emojis: Optional[str]) -> Tuple[bool, Optional[str]]:
-    """Validate emoji input."""
-    if not emojis:
-        return True, None
-
-    if not config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "show", default=True):
-        return False, "Emojis are not enabled."
-
-    max_count = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "max_count", default=3)
-    emoji_count = len(emojis.split())
-
-    if emoji_count > max_count:
-        return False, f"Maximum {max_count} emojis allowed."
-
-    return True, None
-
 def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: Optional[str] = None, emojis: Optional[str] = None) -> str:
-    """Format the nickname with optional T17 number, clan tag, and emojis."""
+    """Format the nickname with optional T17 number and clan tag."""
     result = ""
     
     # Format clan tag if provided and allowed
-    if clan_tag and config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
+    if clan_tag and config.get("rcon", 0, "name_change_registration", "clan_tag", "show", default=True):
         formatted_tag = f"[{clan_tag.upper()}]"
-        tag_position = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "position", default="prefix")
+        tag_position = config.get("rcon", 0, "name_change_registration", "clan_tag", "position", default="prefix")
         
         # Add prefix clan tag
         if tag_position == "prefix":
@@ -78,21 +62,21 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
     # Add base name
     result += base_name
     
-    # Add T17 number if provided
-    if t17_number:
+    # Add T17 number if provided and show is enabled
+    if t17_number and config.get("rcon", 0, "name_change_registration", "t17_number", "show", default=True):
         result += f"#{t17_number}"
     
-    # Add emojis if provided and enabled
-    if emojis and config.get("comfort_functions", 0, "name_change_registration", "emojis", "show", default=True):
-        result += emojis
-    
     # Add suffix clan tag
-    if clan_tag and config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
-        tag_position = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "position", default="prefix")
+    if clan_tag and config.get("rcon", 0, "name_change_registration", "clan_tag", "show", default=True):
+        tag_position = config.get("rcon", 0, "name_change_registration", "clan_tag", "position", default="prefix")
         if tag_position == "suffix":
             result += formatted_tag
     
-    return result[:32] 
+    # Add emojis if provided and enabled
+    if emojis and config.get("rcon", 0, "name_change_registration", "emojis", "show", default=True):
+        result += f" {emojis}"
+    
+    return result[:32]
 
 async def update_user_nickname(
     db_instance,
@@ -116,36 +100,19 @@ async def update_user_nickname(
         if not is_valid:
             return False, "", error_message
 
-        is_valid, error_message = validate_emojis(emojis)
-        if not is_valid:
-            return False, "", error_message
-
-        # Format the nickname
+        # Format nickname with components
         formatted_name = format_nickname(base_name, t17_number, clan_tag, emojis)
-        
+
         # Update nickname
         try:
             await member.edit(nick=formatted_name)
-            
-            # Store the components
-            db_instance.insert_Voter_Registration(
-                member.name,
-                member.id,
-                formatted_name,
-                base_name,
-                0,  # register_cnt
-                0,  # not_ingame_cnt
-                clan_tag,
-                t17_number,
-                emojis,
-                None  # display_format
-            )
-            
             return True, formatted_name, None
-            
         except discord.Forbidden:
-            return False, "", "I don't have permission to change your nickname."
-            
+            return False, "", "I don't have permission to update nicknames."
+        except Exception as e:
+            logger.error(f"Error updating nickname: {e}")
+            return False, "", "Failed to update nickname."
+
     except Exception as e:
         logger.error(f"Error in update_user_nickname: {e}")
         return False, "", "An error occurred while updating the nickname." 

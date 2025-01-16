@@ -1,64 +1,12 @@
 {
     "rcon": [
         {
-        "server_number": 1,
-        "api_url": "",
-        "stats_url": "",
-        "bearer_token": "",
-        "discord_token": "",
-        "log_level": "INFO",
-
-        "comfort_functions":[{
-                "enabled": false,
-                "dryrun": false
-            }],
-
-        "map_rotation":[{
-                "enabled": false,
-                "webhook": ""
-            }],
-
-        "server_status": [{
-                "enabled": false,
-                "webhook": ""
-            }],
-
-        "server_balance": [{
-                "enabled": false,
-                "level_categories": [10, 25, 50, 100, 150, 200, 250],
-                "combat_weights": [0.1, 0.25, 0.25, 0.5, 1, 1, 1, 1.25],
-                "webhook": ""
-            }],
-        "auto_level":[{
-                "enabled": false,
-                "dryrun": false,
-                "min_level": 50,
-                "allow_vips": true,
-                "player_count": 60,
-                "levelbug_enabled": true,
-                "kick_message": "Your level is below {min_level} or you don't own a VIP seat. This server has an adaptive level cap."
-            }],
-        "map_vote": [{
-                "enabled": false,
-                "dryrun": false,
-                "activate_vote": 1,
-                "dectivate_vote": 0,
-                "vote_channel_id": 0,
-                "reminder": 20,
-                "stealth_vote": false,
-                "vote_header": "Vote for the nextmap on <your discord>",
-                "map_pool":[{
-                    "day": 0,
-                    "night": 0,
-                    "wildcard": 0,
-                    "enforce": 0,
-                    "battle_mode":[],
-                    "wildcard_mode":[],
-                    "enforced_maps":[],
-                    "blacklist_maps":[],
-                    "exclude_played_maps": 0
-                }]
-            }],
+            "server_number": 1,
+            "api_url": "",
+            "stats_url": "",
+            "bearer_token": "",
+            "discord_token": "",
+            "log_level": "INFO",
             "name_change_registration": {
                 "enabled": true,
                 "t17_number": {
@@ -78,18 +26,66 @@
                 "roles": {
                     "registered": {
                         "enabled": true,
-                        "role_id": "123456789"
+                        "role_id": "YOUR_ROLE_ID_HERE"
                     },
                     "name_changed": {
                         "enabled": true,
-                        "role_id": "987654321"
+                        "role_id": "YOUR_ROLE_ID_HERE"
                     }
                 },
                 "notifications": {
                     "enabled": true,
-                    "channel_id": "123456789"
+                    "channel_id": "YOUR_CHANNEL_ID_HERE"
                 }
-            }
+            },
+            "comfort_functions": [{
+                "enabled": false,
+                "dryrun": false
+            }],
+            "map_rotation": [{
+                "enabled": false,
+                "webhook": ""
+            }],
+            "server_status": [{
+                "enabled": false,
+                "webhook": ""
+            }],
+            "server_balance": [{
+                "enabled": false,
+                "level_categories": [10, 25, 50, 100, 150, 200, 250],
+                "combat_weights": [0.1, 0.25, 0.25, 0.5, 1, 1, 1, 1.25],
+                "webhook": ""
+            }],
+            "auto_level": [{
+                "enabled": false,
+                "dryrun": false,
+                "min_level": 50,
+                "allow_vips": true,
+                "player_count": 60,
+                "levelbug_enabled": true,
+                "kick_message": "Your level is below {min_level} or you don't own a VIP seat. This server has an adaptive level cap."
+            }],
+            "map_vote": [{
+                "enabled": false,
+                "dryrun": false,
+                "activate_vote": 1,
+                "dectivate_vote": 0,
+                "vote_channel_id": 0,
+                "reminder": 20,
+                "stealth_vote": false,
+                "vote_header": "Vote for the nextmap on <your discord>",
+                "map_pool": [{
+                    "day": 0,
+                    "night": 0,
+                    "wildcard": 0,
+                    "enforce": 0,
+                    "battle_mode": [],
+                    "wildcard_mode": [],
+                    "enforced_maps": [],
+                    "blacklist_maps": [],
+                    "exclude_played_maps": 0
+                }]
+            }]
         }
     ]
 }

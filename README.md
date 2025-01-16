@@ -143,6 +143,19 @@ I have noticed that on some servers simply kick players after seeding because th
   <img src="Assets/mil_calculator_result.png" alt="Logo" width="400">
 </div>
 
+## Name Change Registration
+
+The `name_change_registration` section controls the Discord nickname registration and formatting feature:
+
+- `enabled`: Master switch for the entire feature
+- `t17_number`: Controls T17 number requirements and display
+- `clan_tag`: Controls clan tag formatting and restrictions
+- `emojis`: Controls emoji usage in nicknames
+- `roles`: Configure role assignments for registered users
+- `notifications`: Configure notification settings for registration events
+
+Make sure to replace the role_id and channel_id values with your Discord server's specific IDs.
+
 
 [Jump to the top](#features)
 
@@ -261,6 +274,38 @@ Create a seperate CRCON user. All messages send by the Bot will be in the audit 
         "bearer_token": "",                 // Bearer token (Django API Key) you can create at e.g. https://best.clan.ever/admin
         "discord_token": "",                // Your discord developer token for this bot -> https://discord.com/developers/docs/intro
         "log_level": "INFO",                // I recommend not to change this. 
+
+        "name_change_registration": {
+            "enabled": true,                // Enable/disable the name registration feature
+            "t17_number": {
+                "required": false,          // Whether T17 number is required for registration
+                "show": true               // Whether to display T17 number in nickname
+            },
+            "clan_tag": {
+                "show": true,              // Whether to allow clan tags
+                "position": "prefix",      // Where to place clan tag ("prefix" or "suffix")
+                "blocked_tags": [],        // List of disallowed clan tags
+                "max_length": 4           // Maximum length of clan tags
+            },
+            "emojis": {
+                "show": true,             // Whether to allow emojis in nicknames
+                "max_count": 3            // Maximum number of emojis allowed
+            },
+            "roles": {
+                "registered": {
+                    "enabled": true,      // Whether to assign role on registration
+                    "role_id": ""         // Discord role ID for registered users
+                },
+                "name_changed": {
+                    "enabled": true,      // Whether to assign role on name change
+                    "role_id": ""         // Discord role ID for name changed users
+                }
+            },
+            "notifications": {
+                "enabled": true,          // Whether to send notifications
+                "channel_id": ""          // Discord channel ID for notifications
+            }
+        },
 
         "comfort_functions":[{
                 "enabled": false,           // enabling the comfort functions (discord commands) You have to ensure that the access is limited!
@@ -383,5 +428,3 @@ sudo tail -n 100 -f <logfile>
 ```
 
 [Jump to the top](#content)
-
-

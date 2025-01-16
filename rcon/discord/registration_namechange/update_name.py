@@ -5,10 +5,10 @@ from typing import Optional
 import logging
 from rcon.discord.discordbase import DiscordBase
 from lib.config import config
-from .utils.name_utils import validate_t17_number, validate_clan_tag, validate_emojis, format_nickname, update_user_nickname
+from .utils.name_utils import validate_t17_number, validate_clan_tag, format_nickname, update_user_nickname
 from .utils.role_utils import handle_roles
 from .utils.message_utils import send_success_embed, handle_name_update_response
-from .utils.search_vote_reg import get_player_name
+from .utils.search_vote_reg import get_player_name, update_registration
 
 logger = logging.getLogger(__name__)
 
@@ -19,23 +19,23 @@ class UpdateName(commands.Cog, DiscordBase):
 
     @app_commands.command(
         name="update_name",
-        description="Update your Discord nickname to your latest in-game name"
+        description="Update your Discord nickname and registration settings"
     )
     @app_commands.describe(
         t17_number="Your 4-digit T17 number",
         clan_tag="Your clan tag (optional)",
-        emojis="Your emojis (optional, max 3)"
+        vote_reminders="Enable/disable vote reminders (optional)"
     )
     async def update_name(
         self, 
         interaction: discord.Interaction,
         t17_number: Optional[str] = None,
         clan_tag: Optional[str] = None,
-        emojis: Optional[str] = None
+        vote_reminders: Optional[bool] = None
     ):
         try:
             # Check if feature is enabled
-            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+            if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
                 await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
                 return
 
@@ -59,7 +59,6 @@ class UpdateName(commands.Cog, DiscordBase):
             # Use stored values if not provided in command
             t17_number = t17_number or stored_t17_number
             clan_tag = clan_tag or stored_clan_tag
-            emojis = emojis or stored_emojis
 
             success, formatted_name, error_message = await update_user_nickname(
                 self,
@@ -67,7 +66,7 @@ class UpdateName(commands.Cog, DiscordBase):
                 player_name,
                 t17_number,
                 clan_tag,
-                emojis
+                None
             )
             
             if not success:
@@ -85,14 +84,35 @@ class UpdateName(commands.Cog, DiscordBase):
                 {
                     'clan_tag': clan_tag,
                     't17_number': t17_number,
-                    'emojis': emojis
+                    'emojis': stored_emojis
                 },
                 role_error
             )
 
+            # Update registration with new components
+            success, message = await update_registration(
+                self,
+                interaction.user.name,
+                interaction.user.id,
+                formatted_name,
+                player_name,  # player_id from database
+                vote_reminders,
+                clan_tag,
+                t17_number,
+                stored_emojis  # Keep existing emojis
+            )
+            
+            if success:
+                await interaction.response.send_message(
+                    f"Name updated successfully. {message}",
+                    ephemeral=True
+                )
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+                
         except Exception as e:
-            logger.error(f"Unexpected error in update_name: {e}")
+            logger.error(f"Error in update_name: {e}")
             await interaction.response.send_message(
-                "An error occurred while updating your nickname.",
+                "An error occurred while updating your name.",
                 ephemeral=True
             )

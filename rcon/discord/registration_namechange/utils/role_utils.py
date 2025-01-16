@@ -5,44 +5,41 @@ from lib.config import config
 
 logger = logging.getLogger(__name__)
 
-async def handle_roles(member: discord.Member, action_type: str) -> Optional[str]:
+async def handle_roles(member: discord.Member, action: str) -> Optional[str]:
     """
-    Handle role assignments based on action type.
-    action_type can be 'registered' or 'name_changed'
-    Returns error message if something goes wrong, None on success
+    Handle role assignments for registration and name changes.
+    Returns error message if there's an issue, None if successful.
     """
     try:
-        # Check if role management is enabled for this action
-        if not config.get("comfort_functions", 0, "name_change_registration", "roles", action_type, "enabled", default=False):
+        # Check if roles are configured
+        role_config = config.get("rcon", 0, "name_change_registration", "roles", action)
+        if not role_config or not role_config.get("enabled", False):
             return None
 
-        # Get role ID from config
-        role_id = config.get("comfort_functions", 0, "name_change_registration", "roles", action_type, "role_id")
+        role_id = role_config.get("role_id")
         if not role_id:
-            logger.error(f"No role ID configured for {action_type}")
-            return None
+            logger.error(f"No role_id configured for {action}")
+            return f"No role configured for {action}"
 
         # Get the role
         role = member.guild.get_role(int(role_id))
         if not role:
             logger.error(f"Could not find role with ID {role_id}")
-            return "Could not find the configured role."
+            return f"Could not find configured role"
 
-        # Check bot permissions
-        if not member.guild.me.guild_permissions.manage_roles:
-            return "I don't have permission to manage roles."
-
-        # Check role hierarchy
-        if role >= member.guild.me.top_role:
-            return "I can't assign this role due to role hierarchy."
-
-        # Assign role if member doesn't have it
+        # Add role if member doesn't have it
         if role not in member.roles:
-            await member.add_roles(role)
-            logger.info(f"Added {action_type} role to {member.name}")
+            try:
+                await member.add_roles(role)
+                logger.info(f"Added {role.name} role to {member.name}")
+            except discord.Forbidden:
+                return "Bot doesn't have permission to assign roles"
+            except Exception as e:
+                logger.error(f"Error assigning role: {e}")
+                return "Error assigning role"
 
         return None
 
     except Exception as e:
-        logger.error(f"Error handling roles: {e}")
-        return f"An error occurred while managing roles: {str(e)}" 
+        logger.error(f"Error in handle_roles: {e}")
+        return "Error handling roles" 
