@@ -7,20 +7,23 @@ logger = logging.getLogger(__name__)
 
 def validate_t17_number(t17_number: Optional[str]) -> Tuple[bool, Optional[str]]:
     """Validate T17 number format."""
+    if not t17_number:
+        # Only validate if T17 is required
+        if config.get("rcon", 0, "name_change_registration", "t17_number", "required", default=False):
+            return False, "T17 number is required. Please provide your 4-digit T17 number."
+        return True, None
+
     try:
-        if not t17_number:
-            if config.get("rcon", 0, "name_change_registration", "t17_number", "required", default=False):
-                return False, "T17 number is required. Please provide your 4-digit T17 number."
-            return True, None
-    except ValueError:
-        # If config isn't loaded, assume not required
-        if not t17_number:
-            return True, None
-        
-    if not t17_number.isdigit() or len(t17_number) != 4:
-        return False, "Invalid T17 number. Please provide a 4-digit number."
-        
-    return True, None
+        # Get max length from config
+        max_length = config.get("rcon", 0, "name_change_registration", "t17_number", "max_length", default=4)
+        if len(t17_number) > max_length:
+            return False, f"T17 number must be {max_length} characters or less."
+
+        return True, None
+
+    except Exception as e:
+        logger.error(f"Error validating T17 number: {e}")
+        return False, "An error occurred while validating the T17 number."
 
 def validate_clan_tag(clan_tag: Optional[str]) -> Tuple[bool, Optional[str]]:
     """Validate clan tag format and check against hidden tags."""
@@ -100,14 +103,17 @@ async def update_user_nickname(
     Returns (success, formatted_name, error_message)
     """
     try:
-        # Validate inputs
-        is_valid, error_message = validate_t17_number(t17_number)
-        if not is_valid:
-            return False, "", error_message
+        # Only validate T17 if it's being changed
+        if t17_number is not None:
+            is_valid, error_message = validate_t17_number(t17_number)
+            if not is_valid:
+                return False, "", error_message
 
-        is_valid, error_message = validate_clan_tag(clan_tag)
-        if not is_valid:
-            return False, "", error_message
+        # Validate clan tag if provided
+        if clan_tag is not None:
+            is_valid, error_message = validate_clan_tag(clan_tag)
+            if not is_valid:
+                return False, "", error_message
 
         # Format nickname with components
         formatted_name = format_nickname(base_name, t17_number, clan_tag, emojis)
