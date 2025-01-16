@@ -499,8 +499,18 @@ class VoteMap(commands.Cog, DiscordBase):
         except discord.HTTPException:
             logger.info("An error occurred while fetching the user.")
 
-    async def send_Vote_Message (self, reminder=False):
+    async def send_Vote_Message(self, reminder=False):
         try:
+            # First check if vote reminders are enabled in config
+            if not config.get("rcon", 0, "map_vote", 0, "enabled", default=True):
+                logger.info("Map vote system is disabled in config")
+                return
+
+            # Check if reminders specifically are disabled
+            if reminder and not config.get("rcon", 0, "map_vote", 0, "reminders_enabled", default=True):
+                logger.info("Vote reminders are disabled in config")
+                return
+
             Text = ""
             voters = None
 
@@ -508,35 +518,35 @@ class VoteMap(commands.Cog, DiscordBase):
                 return
 
             if reminder and self.game_start:
-                voters = self.select_T17_Voter (self.game_start)
+                voters = self.select_T17_Voter(self.game_start)
 
             if not reminder:
                 for map in self.Maps.maps:
-                    Text += str (map.pretty_name) + "\n"
+                    Text += str(map.pretty_name) + "\n"
 
-            elif reminder and len (self.vote_results):
+            elif reminder and len(self.vote_results):
                 for map in self.vote_results:
-                    Text += str (map[0]) + " - " + str (map[1]) + " votes\n"
+                    Text += str(map[0]) + " - " + str(map[1]) + " votes\n"
 
-            players = await rcon.get_Players ()
+            players = await rcon.get_Players()
             
             for player in players.players: 
-                # Check if player has voted or (is registered and reminders are disabled for registered users)
+                # Check if player has voted or (is registered and reminders are disabled)
                 if voters is None or (player.player_id not in voters and 
                     (config.get("rcon", 0, "map_vote", 0, "remind_registered_users", default=True) or 
                     not self.select_T17_Voter_Registration(player.player_id))):
                     data = None
-                    data = {"player_id": str (player.player_id) , "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str (Text) }   
+                    data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}   
                         
-                    if data and config.get("rcon", 0, "map_vote", 0, "stealth_vote") == False:
-                        if not (config.get("rcon", 0, "map_vote", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
-                            logger.debug("Vote message: " + str (data)) 
-                            await rcon.send_Player_Message (data)
+                    if data and not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
+                        if not config.get("rcon", 0, "map_vote", 0, "dryrun") or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
+                            logger.debug(f"Vote message: {data}")
+                            await rcon.send_Player_Message(data)
                 else:
-                    logger.info(f"No reminder send to voter {player.name} ({player.player_id})")
+                    logger.info(f"No reminder sent to voter {player.name} ({player.player_id})")
 
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logger.error(f"Error in send_Vote_Message: {e}")
             
     async def check_Origin_Map_Rotation (self):
         try:
