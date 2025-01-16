@@ -777,3 +777,27 @@ class VoteMap(commands.Cog, DiscordBase):
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
+
+    async def vote_timer(self):
+        """Timer for vote reminders and vote end"""
+        try:
+            last_reminder = 0
+            while True:
+                # Only process if voting is active
+                if self.vote_active:
+                    reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0)
+                    current_time = time.time()
+
+                    # Only send reminder if interval has passed and reminders are enabled
+                    if reminder_interval > 0 and (current_time - last_reminder) >= (reminder_interval * 60):
+                        await self.send_Vote_Message(reminder=True)
+                        last_reminder = current_time
+                        logger.debug(f"Sent vote reminder, next reminder in {reminder_interval} minutes")
+                    else:
+                        logger.debug("Skipping reminder - interval not reached or reminders disabled")
+
+                # Wait before next check (60 seconds is more reasonable)
+                await asyncio.sleep(60)
+
+        except Exception as e:
+            logger.error(f"Error in vote timer: {e}")
