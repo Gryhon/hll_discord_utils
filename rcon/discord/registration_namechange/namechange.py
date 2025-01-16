@@ -64,6 +64,12 @@ class NameChange(commands.Cog, DiscordBase):
                 await interaction.response.send_message("Could not find your in-game name.", ephemeral=True)
                 return
 
+            # Get actual player name
+            player_name = await get_player_name(player_id)
+            if not player_name:
+                await interaction.response.send_message("Could not retrieve your player name.", ephemeral=True)
+                return
+
             # Check T17 number requirement
             t17_required = config.get("rcon", 0, "name_change_registration", "t17_number", "required", default=False)
             if t17_required and not t17_number:
@@ -90,7 +96,7 @@ class NameChange(commands.Cog, DiscordBase):
             success, formatted_name, error_message = await update_user_nickname(
                 self,
                 member,
-                ingame_name,
+                player_name,  # Use actual player name instead of ID
                 t17_number,
                 clan_tag,
                 None  # No emojis in initial setup
@@ -103,38 +109,22 @@ class NameChange(commands.Cog, DiscordBase):
             # Handle role assignment
             role_error = await handle_roles(member, 'name_changed')
             
-            # Update registration with new components
-            success, message = await update_registration(
-                self,
-                interaction.user.name,
-                interaction.user.id,
-                formatted_name,
-                player_id,
-                None,  # Keep existing vote reminder setting
-                clan_tag,
-                t17_number,
-                None  # No emojis
-            )
-            
-            # Handle response messages
-            await handle_name_update_response(
-                interaction,
-                member,
-                formatted_name,
-                {
-                    'clan_tag': clan_tag,
-                    't17_number': t17_number,
-                    'emojis': None
-                },
-                role_error
+            # Send single response with complete status
+            await interaction.response.send_message(
+                f"Registration successful! Your nickname has been updated to: {formatted_name}\n" +
+                (f"\nNote: {role_error}" if role_error else ""),
+                ephemeral=True
             )
 
+        except discord.errors.InteractionResponded:
+            logger.warning("Interaction was already responded to")
         except Exception as e:
             logger.error(f"Error in namechange: {e}")
-            await interaction.response.send_message(
-                "An error occurred while updating your nickname.",
-                ephemeral=True
-            ) 
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "An error occurred while updating your nickname.",
+                    ephemeral=True
+                )
 
     @namechange.autocomplete("ingame_name")
     async def namechange_autocomplete(

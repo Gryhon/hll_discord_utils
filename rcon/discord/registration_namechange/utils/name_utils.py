@@ -72,9 +72,13 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
         if tag_position == "suffix":
             result += formatted_tag
     
-    # Add emojis if provided and enabled
+    # Add emojis if provided and enabled - only unicode emojis are supported
     if emojis and config.get("rcon", 0, "name_change_registration", "emojis", "show", default=True):
-        result += f" {emojis}"
+        # Remove any custom emoji format attempts
+        if '<:' in emojis:
+            logger.warning("Custom Discord emojis are not supported in nicknames. Skipping emoji.")
+        else:
+            result += f" {emojis}"
     
     return result[:32]
 

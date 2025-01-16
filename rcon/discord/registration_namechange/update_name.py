@@ -53,41 +53,29 @@ class UpdateName(commands.Cog, DiscordBase):
                     ephemeral=True
                 )
                 return
-                
-            player_name, stored_clan_tag, stored_t17_number, stored_emojis = result
-            
-            # Use stored values if not provided in command
-            t17_number = t17_number or stored_t17_number
-            clan_tag = clan_tag or stored_clan_tag
 
+            # Get the existing player name from the database
+            player_name = await get_player_name(result[0])  # Use the stored T17 ID to get the actual player name
+            if not player_name:
+                await interaction.response.send_message(
+                    "Could not retrieve your player name. Please contact an administrator.",
+                    ephemeral=True
+                )
+                return
+
+            # Update nickname with components
             success, formatted_name, error_message = await update_user_nickname(
                 self,
                 member,
-                player_name,
+                player_name,  # Use the actual player name, not the T17 ID
                 t17_number,
                 clan_tag,
-                None
+                result[3]  # Keep existing emojis
             )
-            
+
             if not success:
                 await interaction.response.send_message(error_message, ephemeral=True)
                 return
-                
-            # Handle role assignment
-            role_error = await handle_roles(member, 'name_changed')
-            
-            # Handle response messages
-            await handle_name_update_response(
-                interaction,
-                member,
-                formatted_name,
-                {
-                    'clan_tag': clan_tag,
-                    't17_number': t17_number,
-                    'emojis': stored_emojis
-                },
-                role_error
-            )
 
             # Update registration with new components
             success, message = await update_registration(
@@ -95,24 +83,26 @@ class UpdateName(commands.Cog, DiscordBase):
                 interaction.user.name,
                 interaction.user.id,
                 formatted_name,
-                player_name,  # player_id from database
-                vote_reminders,
+                result[0],  # Keep existing T17 ID
+                vote_reminders if vote_reminders is not None else bool(result[4]),
                 clan_tag,
                 t17_number,
-                stored_emojis  # Keep existing emojis
+                result[3]  # Keep existing emojis
             )
-            
-            if success:
-                await interaction.response.send_message(
-                    f"Name updated successfully. {message}",
-                    ephemeral=True
-                )
-            else:
-                await interaction.response.send_message(message, ephemeral=True)
-                
-        except Exception as e:
-            logger.error(f"Error in update_name: {e}")
+
+            # Send single response with complete status
             await interaction.response.send_message(
-                "An error occurred while updating your name.",
+                f"Nickname updated to: {formatted_name}\n{message}",
                 ephemeral=True
             )
+
+        except discord.errors.InteractionResponded:
+            # If we somehow already responded, log it but don't try to respond again
+            logger.warning("Interaction was already responded to")
+        except Exception as e:
+            logger.error(f"Error in update_name: {e}")
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    "An error occurred while updating your nickname.",
+                    ephemeral=True
+                )
