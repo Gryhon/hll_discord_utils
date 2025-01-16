@@ -25,20 +25,32 @@ class NameChange(commands.Cog, DiscordBase):
         self.t17_show = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "show", default=True)
         self.enabled = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "enabled", default=True)
 
-    @app_commands.command(name="namechange", description="Update your Discord nickname to match your T17 account")
+    @app_commands.command(
+        name="namechange",
+        description="Update your Discord nickname to match your T17 account"
+    )
     @app_commands.describe(
         ingame_name="Choose your in game user",
         t17_number="Your 4-digit T17 number (if required)",
-        clan_tag="Your clan tag (optional)"
+        clan_tag="Your clan tag (optional)",
+        vote_reminders="Would you like to receive vote reminders?"
     )
+    @app_commands.choices(vote_reminders=[
+        app_commands.Choice(name="Yes", value=1),
+        app_commands.Choice(name="No", value=0)
+    ])
     async def namechange(
         self, 
         interaction: discord.Interaction, 
         ingame_name: str,
         t17_number: Optional[str] = None,
-        clan_tag: Optional[str] = None
+        clan_tag: Optional[str] = None,
+        vote_reminders: app_commands.Choice[int] = None
     ):
         try:
+            # Use default True if no choice made
+            vote_reminder_value = vote_reminders.value if vote_reminders else 1
+            
             # Check if feature is enabled
             if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
                 await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
@@ -92,7 +104,7 @@ class NameChange(commands.Cog, DiscordBase):
                 interaction.user.id,
                 member.nick,
                 player_id,
-                1  # Default to vote reminders enabled
+                vote_reminder_value  # Use the integer value
             )
             if not success:
                 await interaction.response.send_message(message, ephemeral=True)
@@ -102,7 +114,7 @@ class NameChange(commands.Cog, DiscordBase):
             success, formatted_name, error_message = await update_user_nickname(
                 self,
                 member,
-                player_name,  # Use actual player name instead of ID
+                player_name,
                 t17_number,
                 clan_tag,
                 None  # No emojis in initial setup
@@ -111,13 +123,14 @@ class NameChange(commands.Cog, DiscordBase):
             if not success:
                 await interaction.response.send_message(error_message, ephemeral=True)
                 return
-                
+
             # Handle role assignment
             role_error = await handle_roles(member, 'name_changed')
             
             # Send single response with complete status
             await interaction.response.send_message(
                 f"Registration successful! Your nickname has been updated to: {formatted_name}\n" +
+                f"Vote reminders are {'enabled' if vote_reminder_value else 'disabled'}\n" +
                 (f"\nNote: {role_error}" if role_error else ""),
                 ephemeral=True
             )

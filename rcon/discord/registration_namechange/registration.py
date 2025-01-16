@@ -26,15 +26,22 @@ class Registration(commands.Cog, DiscordBase):
     )
     @app_commands.describe(
         ingame_name="Choose your in game user",
-        vote_reminders="Enable/disable vote reminders (optional)"
+        vote_reminders="Would you like to receive vote reminders?"
     )
+    @app_commands.choices(vote_reminders=[
+        app_commands.Choice(name="Yes", value=1),
+        app_commands.Choice(name="No", value=0)
+    ])
     async def voter_registration(
         self,
         interaction: discord.Interaction,
         ingame_name: str,
-        vote_reminders: Optional[bool] = True
+        vote_reminders: app_commands.Choice[int] = None
     ):
         try:
+            # Use default True if no choice made
+            vote_reminder_value = vote_reminders.value if vote_reminders else 1
+
             # Check if feature is enabled
             if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
                 await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
@@ -53,7 +60,7 @@ class Registration(commands.Cog, DiscordBase):
                 interaction.user.id,
                 member.nick,
                 ingame_name,
-                1 if vote_reminders else 0  # Convert bool to int for database
+                vote_reminder_value  # Convert bool to int for database
             )
             
             if success:
