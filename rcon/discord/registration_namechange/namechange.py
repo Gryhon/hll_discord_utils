@@ -59,7 +59,7 @@ class NameChange(commands.Cog, DiscordBase):
                 return
 
             # Get player info from database
-            player_id = await get_player_name(self, ingame_name)
+            player_id = await get_player_name(ingame_name)
             if not player_id:
                 await interaction.response.send_message("Could not find your in-game name.", ephemeral=True)
                 return
