@@ -5,6 +5,11 @@ from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
 from lib.config import config
+from .utils import (
+    update_user_nickname,
+    update_registration,
+    get_player_name
+)
 
 logger = logging.getLogger(__name__)
 
