@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 def validate_t17_number(t17_number: Optional[str]) -> Tuple[bool, Optional[str]]:
     """Validate T17 number format."""
     if not t17_number:
-        if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False):
+        if config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False):
             return False, "T17 number is required. Please provide your 4-digit T17 number."
         return True, None
         
@@ -21,8 +21,11 @@ def validate_clan_tag(clan_tag: Optional[str]) -> Tuple[bool, Optional[str]]:
     if not clan_tag:
         return True, None
 
-    max_length = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "max_length", default=4)
-    blocked_tags = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
+    if not config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
+        return False, "Clan tags are not enabled."
+
+    max_length = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "max_length", default=4)
+    blocked_tags = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
     
     if len(clan_tag) > max_length:
         return False, f"Clan tag must be {max_length} characters or less."
@@ -53,9 +56,9 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
     result = ""
     
     # Format clan tag if provided and allowed
-    if clan_tag and config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
+    if clan_tag and config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
         formatted_tag = f"[{clan_tag.upper()}]"
-        tag_position = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "position", default="prefix")
+        tag_position = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "position", default="prefix")
         
         # Add prefix clan tag
         if tag_position == "prefix":
@@ -69,14 +72,13 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
         result += f"#{t17_number}"
     
     # Add emojis if provided and enabled
-    if emojis and config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "show", default=True):
+    if emojis and config.get("comfort_functions", 0, "name_change_registration", "emojis", "show", default=True):
         result += emojis
     
     # Add suffix clan tag
-    if clan_tag and config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
-        tag_position = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "position", default="prefix")
+    if clan_tag and config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
+        tag_position = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "position", default="prefix")
         if tag_position == "suffix":
             result += formatted_tag
     
-    # Respect Discord's limit
     return result[:32] 

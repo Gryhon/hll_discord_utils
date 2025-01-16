@@ -13,11 +13,11 @@ async def handle_roles(member: discord.Member, action_type: str) -> Optional[str
     """
     try:
         # Check if role management is enabled for this action
-        if not config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "roles", action_type, "enabled", default=False):
+        if not config.get("comfort_functions", 0, "name_change_registration", "roles", action_type, "enabled", default=False):
             return None
 
         # Get role ID from config
-        role_id = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "roles", action_type, "role_id")
+        role_id = config.get("comfort_functions", 0, "name_change_registration", "roles", action_type, "role_id")
         if not role_id:
             logger.error(f"No role ID configured for {action_type}")
             return None
@@ -45,4 +45,4 @@ async def handle_roles(member: discord.Member, action_type: str) -> Optional[str
 
     except Exception as e:
         logger.error(f"Error handling roles: {e}")
-        return f"An error occurred while managing roles: {str(e)}"
+        return f"An error occurred while managing roles: {str(e)}" 

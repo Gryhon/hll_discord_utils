@@ -18,7 +18,7 @@ async def send_success_embed(
     """
     try:
         # Check if message sending is enabled and get channel ID
-        channel_id = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "notifications", "channel_id")
+        channel_id = config.get("comfort_functions", 0, "name_change_registration", "notifications", "channel_id")
         if not channel_id:
             return
 

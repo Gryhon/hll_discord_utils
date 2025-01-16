@@ -24,9 +24,9 @@ class UpdateName(commands.Cog, DiscordBase):
         description="Update your Discord nickname to your latest in-game name"
     )
     @app_commands.describe(
-        t17_number="Your 4-digit T17 number (optional)" if not config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
-        clan_tag="Your clan tag (optional)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
-        emojis="Your emojis (optional, max 3)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
+        t17_number="Your 4-digit T17 number (optional)" if not config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
+        clan_tag="Your clan tag (optional)" if config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
+        emojis="Your emojis (optional, max 3)" if config.get("comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
     )
     async def update_name(
         self, 

@@ -10,7 +10,6 @@ from .utils.search_vote_reg import query_player_database, register_user, get_pla
 from lib.config import config
 from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis
 from .utils.role_utils import handle_roles
-from .utils.message_utils import send_success_embed
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -27,9 +26,9 @@ class NameChange(commands.Cog, DiscordBase):
     @app_commands.command(name="namechange", description="Update your Discord nickname to match your T17 account")
     @app_commands.describe(
         ingame_name="Choose your in game user",
-        t17_number="Your 4-digit T17 number (optional)" if not config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
-        clan_tag="Your clan tag (optional)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
-        emojis="Your emojis (optional, max 3)" if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
+        t17_number="Your 4-digit T17 number (optional)" if not config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
+        clan_tag="Your clan tag (optional)" if config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
+        emojis="Your emojis (optional, max 3)" if config.get("comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
     )
     async def namechange(
         self, 
