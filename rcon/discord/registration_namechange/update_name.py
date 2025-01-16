@@ -16,26 +16,37 @@ class UpdateName(commands.Cog, DiscordBase):
     def __init__(self, bot):
         super().__init__()
         self.bot = bot
-        self.t17_required = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False)
-        self.t17_show = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "show", default=True)
+
+    def get_t17_description(self) -> str:
+        """Get the T17 number description based on config."""
+        try:
+            required = config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False)
+            return "Your 4-digit T17 number" if required else "Your 4-digit T17 number (optional)"
+        except ValueError:
+            return "Your 4-digit T17 number (optional)"
 
     @app_commands.command(
         name="update_name",
         description="Update your Discord nickname to your latest in-game name"
     )
     @app_commands.describe(
-        t17_number="Your 4-digit T17 number (optional)" if not config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else "Your 4-digit T17 number",
-        clan_tag="Your clan tag (optional)" if config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True) else None,
-        emojis="Your emojis (optional, max 3)" if config.get("comfort_functions", 0, "name_change_registration", "emojis", "show", default=True) else None
+        t17_number=get_t17_description,
+        clan_tag="Your clan tag (optional)",
+        emojis="Your emojis (optional, max 3)"
     )
     async def update_name(
         self, 
         interaction: discord.Interaction,
-        t17_number: str if config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False) else Optional[str] = None,
+        t17_number: Optional[str] = None,
         clan_tag: Optional[str] = None,
         emojis: Optional[str] = None
     ):
         try:
+            # Check if feature is enabled
+            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+                await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
+                return
+
             # Validate inputs
             is_valid, error_message = validate_t17_number(t17_number)
             if not is_valid:

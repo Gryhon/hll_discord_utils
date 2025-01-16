@@ -6,10 +6,15 @@ logger = logging.getLogger(__name__)
 
 def validate_t17_number(t17_number: Optional[str]) -> Tuple[bool, Optional[str]]:
     """Validate T17 number format."""
-    if not t17_number:
-        if config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False):
-            return False, "T17 number is required. Please provide your 4-digit T17 number."
-        return True, None
+    try:
+        if not t17_number:
+            if config.get("comfort_functions", 0, "name_change_registration", "t17_number", "required", default=False):
+                return False, "T17 number is required. Please provide your 4-digit T17 number."
+            return True, None
+    except ValueError:
+        # If config isn't loaded, assume not required
+        if not t17_number:
+            return True, None
         
     if not t17_number.isdigit() or len(t17_number) != 4:
         return False, "Invalid T17 number. Please provide a 4-digit number."
@@ -21,11 +26,16 @@ def validate_clan_tag(clan_tag: Optional[str]) -> Tuple[bool, Optional[str]]:
     if not clan_tag:
         return True, None
 
-    if not config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
-        return False, "Clan tags are not enabled."
+    try:
+        if not config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "show", default=True):
+            return False, "Clan tags are not enabled."
 
-    max_length = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "max_length", default=4)
-    blocked_tags = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
+        max_length = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "max_length", default=4)
+        blocked_tags = config.get("comfort_functions", 0, "name_change_registration", "clan_tag", "blocked_tags", default=[])
+    except ValueError:
+        # If config isn't loaded, use defaults
+        max_length = 4
+        blocked_tags = []
     
     if len(clan_tag) > max_length:
         return False, f"Clan tag must be {max_length} characters or less."
