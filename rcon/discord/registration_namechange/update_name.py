@@ -5,9 +5,9 @@ from typing import Optional
 import logging
 from rcon.discord.discordbase import DiscordBase
 from lib.config import config
-from .utils.name_utils import validate_t17_number, validate_clan_tag, validate_emojis, format_nickname
+from .utils.name_utils import validate_t17_number, validate_clan_tag, validate_emojis, format_nickname, update_user_nickname
 from .utils.role_utils import handle_roles
-from .utils.message_utils import send_success_embed
+from .utils.message_utils import send_success_embed, handle_name_update_response
 from .utils.search_vote_reg import get_player_name
 
 logger = logging.getLogger(__name__)
@@ -45,63 +45,50 @@ class UpdateName(commands.Cog, DiscordBase):
                 await interaction.response.send_message("Could not find your Discord account.", ephemeral=True)
                 return
 
-            # Validate inputs
-            is_valid, error_message = validate_t17_number(t17_number)
-            if not is_valid:
-                await interaction.response.send_message(error_message, ephemeral=True)
-                return
-
-            is_valid, error_message = validate_clan_tag(clan_tag)
-            if not is_valid:
-                await interaction.response.send_message(error_message, ephemeral=True)
-                return
-
-            is_valid, error_message = validate_emojis(emojis)
-            if not is_valid:
-                await interaction.response.send_message(error_message, ephemeral=True)
-                return
-
-            # Get player name from database
-            player_name = await get_player_name(self, interaction.user.id)
-            if not player_name:
+            # Get player name and components from database
+            result = self.select_T17_Voter_Registration(interaction.user.id)
+            if not result:
                 await interaction.response.send_message(
                     "You are not registered. Please use /voter_registration first.",
                     ephemeral=True
                 )
                 return
+                
+            player_name, stored_clan_tag, stored_t17_number, stored_emojis = result
+            
+            # Use stored values if not provided in command
+            t17_number = t17_number or stored_t17_number
+            clan_tag = clan_tag or stored_clan_tag
+            emojis = emojis or stored_emojis
 
-            # Update nickname
-            if player_name:
-                formatted_name = format_nickname(player_name, t17_number, clan_tag, emojis)
-                try:
-                    await member.edit(nick=formatted_name)
-                    
-                    # Assign role if configured
-                    error_msg = await handle_roles(member, 'name_changed')
-                    
-                    # Send success embed
-                    await send_success_embed(
-                        interaction.guild,
-                        interaction.user,
-                        'name_changed',
-                        formatted_name
-                    )
-                    
-                    if error_msg:
-                        await interaction.response.send_message(
-                            f"Nickname updated successfully, but note: {error_msg}",
-                            ephemeral=True
-                        )
-                    else:
-                        await interaction.response.send_message(
-                            "Successfully updated your nickname!",
-                            ephemeral=True
-                        )
-                except discord.Forbidden:
-                    await interaction.response.send_message(
-                        "I don't have permission to change your nickname.",
-                        ephemeral=True
-                    )
+            success, formatted_name, error_message = await update_user_nickname(
+                self,
+                member,
+                player_name,
+                t17_number,
+                clan_tag,
+                emojis
+            )
+            
+            if not success:
+                await interaction.response.send_message(error_message, ephemeral=True)
+                return
+                
+            # Handle role assignment
+            role_error = await handle_roles(member, 'name_changed')
+            
+            # Handle response messages
+            await handle_name_update_response(
+                interaction,
+                member,
+                formatted_name,
+                {
+                    'clan_tag': clan_tag,
+                    't17_number': t17_number,
+                    'emojis': emojis
+                },
+                role_error
+            )
 
         except Exception as e:
             logger.error(f"Unexpected error in update_name: {e}")

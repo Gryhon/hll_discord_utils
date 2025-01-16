@@ -6,11 +6,11 @@ from typing import List, Optional
 from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
-from .utils.search_vote_reg import query_player_database, register_user, get_player_name
+from .utils.search_vote_reg import query_player_database, register_user, get_player_name, handle_autocomplete
 from lib.config import config
-from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis
+from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis, update_user_nickname
 from .utils.role_utils import handle_roles
-from .utils.message_utils import send_success_embed
+from .utils.message_utils import send_success_embed, handle_name_update_response
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -39,94 +39,46 @@ class NameChange(commands.Cog, DiscordBase):
         clan_tag: Optional[str] = None,
         emojis: Optional[str] = None
     ):
-        if not self.enabled:
-            await interaction.response.send_message("Name change functionality is currently disabled.", ephemeral=True)
-            return
-
         try:
-            # Validate T17 number
-            is_valid, error_message = validate_t17_number(t17_number)
-            if not is_valid:
-                await interaction.response.send_message(error_message, ephemeral=True)
+            # Check if feature is enabled
+            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+                await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
                 return
 
-            # Validate clan tag
-            is_valid, error_message = validate_clan_tag(clan_tag)
-            if not is_valid:
-                await interaction.response.send_message(error_message, ephemeral=True)
-                return
-
-            is_valid, error_message = validate_emojis(emojis)
-            if not is_valid:
-                await interaction.response.send_message(error_message, ephemeral=True)
-                return
-
+            # Get member
             member = interaction.guild.get_member(interaction.user.id)
             if not member:
-                await interaction.response.send_message("Could not find your Discord member information.", ephemeral=True)
+                await interaction.response.send_message("Could not find your Discord account.", ephemeral=True)
                 return
 
-            # Check if bot has permission to change nicknames
-            bot_member = interaction.guild.get_member(self.bot.user.id)
-            if not bot_member.guild_permissions.manage_nicknames:
-                await interaction.response.send_message("I don't have permission to change nicknames in this server.", ephemeral=True)
-                return
-
-            # Check if user is higher in hierarchy
-            if member.top_role >= bot_member.top_role:
-                await interaction.response.send_message("I can't modify your nickname due to role hierarchy.", ephemeral=True)
-                return
-
-            success, message = await register_user(
+            success, formatted_name, error_message = await update_user_nickname(
                 self,
-                interaction.user.name,
-                interaction.user.id,
-                member.nick,
-                ingame_name
+                member,
+                ingame_name,
+                t17_number,
+                clan_tag,
+                emojis
             )
-
+            
             if not success:
-                await interaction.response.send_message(message, ephemeral=True)
+                await interaction.response.send_message(error_message, ephemeral=True)
                 return
-
-            # Get and update nickname
-            player_name = await get_player_name(ingame_name)
-            if player_name:
-                formatted_name = format_nickname(player_name, t17_number, clan_tag, emojis)
-                try:
-                    await member.edit(nick=formatted_name)
-                    
-                    # Assign role if configured
-                    error_msg = await handle_roles(member, 'name_changed')
-                    
-                    # Send success embed
-                    await send_success_embed(
-                        interaction.guild,
-                        interaction.user,
-                        'name_changed',
-                        formatted_name
-                    )
-                    
-                    if error_msg:
-                        await interaction.response.send_message(
-                            f"Nickname updated successfully, but note: {error_msg}",
-                            ephemeral=True
-                        )
-                    else:
-                        await interaction.response.send_message(
-                            "Successfully updated your nickname!",
-                            ephemeral=True
-                        )
-                except discord.Forbidden:
-                    await interaction.response.send_message(
-                        "I don't have permission to change your nickname.",
-                        ephemeral=True
-                    )
-            else:
-                await interaction.response.send_message(
-                    "Registration successful, but couldn't fetch your in-game name.", 
-                    ephemeral=True
-                )
+                
+            # Handle role assignment
+            role_error = await handle_roles(member, 'name_changed')
+            
+            # Handle response messages
+            await handle_name_update_response(
+                interaction,
+                member,
+                formatted_name,
+                {
+                    'clan_tag': clan_tag,
+                    't17_number': t17_number,
+                    'emojis': emojis
+                },
+                role_error
+            )
 
         except Exception as e:
             logger.error(f"Unexpected error in namechange: {e}")
@@ -137,30 +89,4 @@ class NameChange(commands.Cog, DiscordBase):
 
     @namechange.autocomplete("ingame_name")
     async def namechange_autocomplete(self, interaction: discord.Interaction, player_name: str) -> List[app_commands.Choice[str]]:
-        try:
-            while self.in_Loop:
-                await asyncio.sleep(1)
-           
-            self.in_Loop = True
-            name = player_name
-            multi_array = None
-
-            if len(name) >= 2:
-                logger.info(f"Search query: {name.replace(" ", "%")}")
-                multi_array = await query_player_database(name.replace(" ", "%"))
-        
-            if multi_array is not None and len(multi_array) >= 1:
-                result = [
-                    app_commands.Choice(name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {", ".join(player[1])}"[:100], value=player[0])
-                    for player in multi_array
-                ]
-                self.in_Loop = False
-                return result
-            else:
-                self.in_Loop = False
-                return []
-            
-        except Exception as e:
-            logger.error(f"Unexpected error in namechange_autocomplete: {e}")
-            self.in_Loop = False
-            return [] 
+        return await handle_autocomplete(interaction, player_name, self.in_Loop) 

@@ -7,7 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
 from lib.config import config
-from .utils.search_vote_reg import query_player_database, register_user
+from .utils.search_vote_reg import query_player_database, register_user, handle_autocomplete
 from .utils.role_utils import handle_roles
 from .utils.message_utils import send_success_embed
 
@@ -53,38 +53,13 @@ class Registration(commands.Cog, DiscordBase):
                     interaction.guild.get_member(interaction.user.id).nick or interaction.user.name,
                     ingame_name
                 )
-                    
+                
             await interaction.response.send_message(message, ephemeral=True)
+            
         except Exception as e:
             logger.error(f"Unexpected error in voter_registration: {e}")
             await interaction.response.send_message("An error occurred during registration.", ephemeral=True)
 
     @voter_registration.autocomplete("ingame_name")
     async def voter_autocomplete(self, interaction: discord.Interaction, player_name: str) -> List[app_commands.Choice[str]]:
-        try:
-            while self.in_Loop:
-                await asyncio.sleep(1)
-           
-            self.in_Loop = True
-            name = player_name
-            multi_array = None
-
-            if len(name) >= 2:
-                logger.info(f"Search query: {name.replace(" ", "%")}")
-                multi_array = await query_player_database(name.replace(" ", "%"))
-        
-            if multi_array is not None and len(multi_array) >= 1:
-                result = [
-                    app_commands.Choice(name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {", ".join(player[1])}"[:100], value=player[0])
-                    for player in multi_array
-                ]
-                self.in_Loop = False
-                return result
-            else:
-                self.in_Loop = False
-                return []
-            
-        except Exception as e:
-            logger.error(f"Unexpected error in voter_autocomplete: {e}")
-            self.in_Loop = False
-            return [] 
+        return await handle_autocomplete(interaction, player_name, self.in_Loop) 

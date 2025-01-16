@@ -4,6 +4,7 @@ from typing import Optional
 from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
+from rcon.config import config
 
 logger = logging.getLogger(__name__)
 
@@ -27,13 +28,15 @@ class Unregister(commands.Cog, DiscordBase):
     ):
         try:
             # Check if user is registered
-            player_id = self.select_T17_Voter_Registration(user.id)
-            if player_id is None:
+            result = self.select_T17_Voter_Registration(user.id)
+            if result is None:
                 await interaction.response.send_message(
                     f"User {user.name} is not registered.",
                     ephemeral=True
                 )
                 return
+
+            player_id = result[0]  # Get T17 ID from tuple
 
             # Remove from database using DiscordBase method
             if self.delete_T17_Voter_Registration(user.id):
@@ -69,13 +72,20 @@ class Unregister(commands.Cog, DiscordBase):
     ):
         try:
             target_user = user or interaction.user
-            player_id = self.select_T17_Voter_Registration(target_user.id)
+            result = self.select_T17_Voter_Registration(target_user.id)
             
-            if player_id:
-                await interaction.response.send_message(
-                    f"User {target_user.name} is registered with T17 ID: {player_id}",
-                    ephemeral=True
-                )
+            if result:
+                player_id, clan_tag, t17_number, emojis = result
+                components = []
+                if clan_tag: components.append(f"Clan: {clan_tag}")
+                if t17_number: components.append(f"T17#: {t17_number}")
+                if emojis: components.append(f"Emojis: {emojis}")
+                
+                info = f"User {target_user.name} is registered with T17 ID: {player_id}"
+                if components:
+                    info += f"\nComponents: {', '.join(components)}"
+                    
+                await interaction.response.send_message(info, ephemeral=True)
             else:
                 await interaction.response.send_message(
                     f"User {target_user.name} is not registered.",
@@ -87,4 +97,43 @@ class Unregister(commands.Cog, DiscordBase):
             await interaction.response.send_message(
                 "An error occurred while checking registration status.",
                 ephemeral=True
-            ) 
+            )
+
+    @app_commands.command(name="unregister", description="Remove your T17 account registration")
+    async def unregister(self, interaction: discord.Interaction):
+        try:
+            # Check if feature is enabled
+            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+                await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
+                return
+
+            # Get member
+            member = interaction.guild.get_member(interaction.user.id)
+            if not member:
+                await interaction.response.send_message("Could not find your Discord account.", ephemeral=True)
+                return
+
+            # Check if user is registered
+            result = self.select_T17_Voter_Registration(interaction.user.id)
+            if result is None:
+                await interaction.response.send_message("You are not registered.", ephemeral=True)
+                return
+
+            # Delete registration
+            success = self.delete_T17_Voter_Registration(interaction.user.id)
+            
+            if success:
+                # Reset nickname if possible
+                try:
+                    await member.edit(nick=None)
+                except discord.Forbidden:
+                    pass  # Ignore if we can't change nickname
+                    
+                logger.info(f"User {interaction.user.name} (ID: {interaction.user.id}) was unregistered by {interaction.user.name}")
+                await interaction.response.send_message("Successfully unregistered your T17 account.", ephemeral=True)
+            else:
+                await interaction.response.send_message("An error occurred while unregistering.", ephemeral=True)
+
+        except Exception as e:
+            logger.error(f"Error in unregister: {e}")
+            await interaction.response.send_message("An error occurred while unregistering.", ephemeral=True) 

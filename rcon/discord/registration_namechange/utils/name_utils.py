@@ -1,6 +1,7 @@
 import logging
 from typing import Tuple, Optional
 from lib.config import config
+import discord
 
 logger = logging.getLogger(__name__)
 
@@ -92,3 +93,59 @@ def format_nickname(base_name: str, t17_number: Optional[str] = None, clan_tag: 
             result += formatted_tag
     
     return result[:32] 
+
+async def update_user_nickname(
+    db_instance,
+    member: discord.Member,
+    base_name: str,
+    t17_number: Optional[str] = None,
+    clan_tag: Optional[str] = None,
+    emojis: Optional[str] = None
+) -> Tuple[bool, str, Optional[str]]:
+    """
+    Update a user's nickname with the given components.
+    Returns (success, formatted_name, error_message)
+    """
+    try:
+        # Validate inputs
+        is_valid, error_message = validate_t17_number(t17_number)
+        if not is_valid:
+            return False, "", error_message
+
+        is_valid, error_message = validate_clan_tag(clan_tag)
+        if not is_valid:
+            return False, "", error_message
+
+        is_valid, error_message = validate_emojis(emojis)
+        if not is_valid:
+            return False, "", error_message
+
+        # Format the nickname
+        formatted_name = format_nickname(base_name, t17_number, clan_tag, emojis)
+        
+        # Update nickname
+        try:
+            await member.edit(nick=formatted_name)
+            
+            # Store the components
+            db_instance.insert_Voter_Registration(
+                member.name,
+                member.id,
+                formatted_name,
+                base_name,
+                0,  # register_cnt
+                0,  # not_ingame_cnt
+                clan_tag,
+                t17_number,
+                emojis,
+                None  # display_format
+            )
+            
+            return True, formatted_name, None
+            
+        except discord.Forbidden:
+            return False, "", "I don't have permission to change your nickname."
+            
+    except Exception as e:
+        logger.error(f"Error in update_user_nickname: {e}")
+        return False, "", "An error occurred while updating the nickname." 

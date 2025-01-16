@@ -2,6 +2,10 @@ import logging
 import re
 from typing import List, Tuple, Optional
 import rcon.rcon as rcon
+import asyncio
+import discord
+from discord import app_commands
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -31,31 +35,71 @@ async def register_user(db_instance, user_name: str, user_id: int, nick_name: st
                          '''after the selection.'''
 
         # Check if already registered
-        player_id = db_instance.select_T17_Voter_Registration(user_id)
-        if player_id is not None:
+        result = db_instance.select_T17_Voter_Registration(user_id)
+        if result is not None:
             return False, "You are already registered. If it wasn't you, please contact @Techsupport!"
 
-        # Register the user
-        db_instance.insert_Voter_Registration(user_name, user_id, nick_name, ingame_name, 0, 0)
+        # Register the user with initial empty components
+        db_instance.insert_Voter_Registration(
+            user_name,
+            user_id,
+            nick_name,
+            ingame_name,
+            0,  # register_cnt
+            0,  # not_ingame_cnt
+            None,  # clan_tag
+            None,  # t17_number
+            None,  # emojis
+            None   # display_format
+        )
         return True, "Registration successful"
 
     except Exception as e:
         logger.error(f"Unexpected error in register_user: {e}")
         return False, "An error occurred during registration"
 
+async def handle_autocomplete(interaction: discord.Interaction, player_name: str, in_loop_ref) -> List[app_commands.Choice[str]]:
+    """Handle autocomplete for player names"""
+    try:
+        while in_loop_ref:
+            await asyncio.sleep(1)
+           
+        in_loop_ref = True
+        name = player_name
+        multi_array = None
+
+        if len(name) >= 2:
+            logger.info(f"Search query: {name.replace(" ", "%")}")
+            multi_array = await query_player_database(name.replace(" ", "%"))
+        
+        if multi_array is not None and len(multi_array) >= 1:
+            result = [
+                app_commands.Choice(name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {", ".join(player[1])}"[:100], value=player[0])
+                for player in multi_array
+            ]
+            in_loop_ref = False
+            return result
+        
+        in_loop_ref = False
+        return []
+            
+    except Exception as e:
+        logger.error(f"Unexpected error in handle_autocomplete: {e}")
+        in_loop_ref = False
+        return []
+    finally:
+        in_loop_ref = False 
+
 async def get_player_name(t17_id: str) -> Optional[str]:
-    """Fetch the player's most recent name from their history using their T17 ID."""
+    """Get a player's name from their T17 ID."""
     try:
         history_result = await rcon.get_Player_History({"player_id": t17_id})
         if history_result:
-            players = history_result.get_Players_Name()
-            if players and len(players) > 0:
-                # Get most recent name and take only the first name before any comma
-                recent_name = players[0][1][0]  # Take first name from the array
-                return recent_name[:32]  # Discord nickname limit
-                
+            player_names = history_result.get_Players_Name()
+            if player_names and len(player_names) > 0:
+                return player_names[0][1][0]  # Get first name from first record
         return None
-
+            
     except Exception as e:
         logger.error(f"Unexpected error in get_player_name: {e}")
         return None 
