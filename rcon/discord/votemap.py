@@ -441,7 +441,7 @@ class VoteMap(commands.Cog, DiscordBase):
             self.vote_active = await self.check_Active_Vote ()
 
             if not self.vote_active:
-                topic = "Vote for the next map:"                
+                topic = "Vote for the next map:"
 
                 await self.get_Game_State ()
 

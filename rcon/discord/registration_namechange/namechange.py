@@ -30,7 +30,6 @@ class NameChange(commands.Cog, DiscordBase):
         t17_number="Your 4-digit T17 number (if required)",
         clan_tag="Your clan tag (optional)"
     )
-    @app_commands.autocomplete(ingame_name=handle_autocomplete)
     async def namechange(
         self, 
         interaction: discord.Interaction, 
@@ -136,3 +135,11 @@ class NameChange(commands.Cog, DiscordBase):
                 "An error occurred while updating your nickname.",
                 ephemeral=True
             ) 
+
+    @namechange.autocomplete("ingame_name")
+    async def namechange_autocomplete(
+        self,
+        interaction: discord.Interaction,
+        current: str
+    ) -> List[app_commands.Choice[str]]:
+        return await handle_autocomplete(interaction, current, self.in_Loop) 

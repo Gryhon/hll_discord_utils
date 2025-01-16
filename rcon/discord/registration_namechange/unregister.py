@@ -4,7 +4,7 @@ from typing import Optional
 from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
-from rcon.config import config
+from lib.config import config
 from rcon.discord.registration_namechange.utils.search_vote_reg import get_registration_details, format_registration_info
 
 logger = logging.getLogger(__name__)
