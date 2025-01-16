@@ -49,7 +49,7 @@ class UpdateName(commands.Cog, DiscordBase):
                 await interaction.response.send_message("Could not find your Discord account.", ephemeral=True)
                 return
 
-            # Get player name and components from database
+            # Get current registration
             result = self.select_T17_Voter_Registration(interaction.user.id)
             if not result:
                 await interaction.response.send_message(
@@ -58,8 +58,14 @@ class UpdateName(commands.Cog, DiscordBase):
                 )
                 return
 
+            # Safely get current values with defaults
+            t17_id = result[0]  # T17 ID is always present
+            current_clan = result[1] if len(result) > 1 else None
+            current_t17 = result[2] if len(result) > 2 else None
+            current_emojis = result[3] if len(result) > 3 else None
+
             # Get the existing player name from the database
-            player_name = await get_player_name(result[0])  # Use the stored T17 ID to get the actual player name
+            player_name = await get_player_name(t17_id)
             if not player_name:
                 await interaction.response.send_message(
                     "Could not retrieve your player name. Please contact an administrator.",
@@ -71,10 +77,10 @@ class UpdateName(commands.Cog, DiscordBase):
             success, formatted_name, error_message = await update_user_nickname(
                 self,
                 member,
-                player_name,  # Use the actual player name, not the T17 ID
-                t17_number,
-                clan_tag,
-                result[3]  # Keep existing emojis
+                player_name,
+                t17_number if t17_number is not None else current_t17,
+                clan_tag if clan_tag is not None else current_clan,
+                current_emojis
             )
 
             if not success:
@@ -87,11 +93,11 @@ class UpdateName(commands.Cog, DiscordBase):
                 interaction.user.name,
                 interaction.user.id,
                 formatted_name,
-                result[0],  # Keep existing T17 ID
-                vote_reminders.value if vote_reminders is not None else bool(result[4]),
-                clan_tag,
-                t17_number,
-                result[3]  # Keep existing emojis
+                t17_id,
+                vote_reminders.value if vote_reminders is not None else bool(result[4]) if len(result) > 4 else True,
+                clan_tag if clan_tag is not None else current_clan,
+                t17_number if t17_number is not None else current_t17,
+                current_emojis
             )
 
             # Send single response with complete status
