@@ -26,7 +26,7 @@ class NameChange(commands.Cog, DiscordBase):
         self.enabled = config.get("rcon", 0, "comfort_functions", 0, "name_change_registration", "enabled", default=True)
 
     @app_commands.command(
-        name="namechange",
+        name="setup-name",
         description="Update your Discord nickname to match your T17 account"
     )
     @app_commands.describe(
