@@ -73,22 +73,37 @@ class NameEmoji(commands.Cog, DiscordBase):
         emojis: Optional[str] = None
     ):
         try:
+            logger.info(f"Name emoji request from {interaction.user.name} (ID: {interaction.user.id}) with emojis: {emojis}")
+            
             # Check if feature is enabled
             if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
+                logger.info("Feature disabled in config")
                 await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
                 return
 
             # Get member
             member = interaction.guild.get_member(interaction.user.id)
             if not member:
+                logger.error(f"Could not find member for user {interaction.user.name} (ID: {interaction.user.id})")
                 await interaction.response.send_message("Could not find your Discord account.", ephemeral=True)
                 return
 
             # Get current registration
             result = self.select_T17_Voter_Registration(interaction.user.id)
             if not result:
+                logger.warning(f"User {interaction.user.name} not registered")
                 await interaction.response.send_message(
                     "You are not registered. Please use /voter_registration first.",
+                    ephemeral=True
+                )
+                return
+
+            # Get the actual player name first (like update_name does)
+            player_name = await get_player_name(result[0])  # Use the stored T17 ID to get the actual player name
+            if not player_name:
+                logger.error(f"Could not retrieve player name for {interaction.user.name}")
+                await interaction.response.send_message(
+                    "Could not retrieve your player name. Please contact an administrator.",
                     ephemeral=True
                 )
                 return
@@ -96,42 +111,48 @@ class NameEmoji(commands.Cog, DiscordBase):
             # Validate emojis
             valid, error = self.validate_emojis(emojis)
             if not valid:
+                logger.warning(f"Invalid emojis from {interaction.user.name}: {emojis}. Error: {error}")
                 await interaction.response.send_message(error, ephemeral=True)
                 return
 
-            # Update nickname
-            success, new_name = await self.update_nickname_with_emojis(member, emojis)
-            
-            if not success:
-                await interaction.response.send_message(new_name, ephemeral=True)  # new_name contains error message
-                return
-
-            # Update database
-            try:
-                self.cursor.execute(
-                    '''UPDATE voter_register 
-                       SET votreg_emojis = ?
-                       WHERE votreg_dis_user_id = ? 
-                       ORDER BY votreg_seqno DESC LIMIT 1''',
-                    (emojis, interaction.user.id)
-                )
-                self.conn.commit()
-            except Exception as e:
-                logger.error(f"Database error in name_emoji: {e}")
-                await interaction.response.send_message(
-                    "Your nickname was updated but there was an error saving to the database.",
-                    ephemeral=True
-                )
-                return
-
-            await interaction.response.send_message(
-                f"Emojis updated successfully. New nickname: {new_name}",
-                ephemeral=True
+            # Update nickname with components - using the fetched player_name
+            success, formatted_name, error_message = await update_user_nickname(
+                self,
+                member,
+                player_name,  # Use the actual player name we just fetched
+                result[2],    # T17 number
+                result[1],    # Clan tag
+                emojis       # New emojis
             )
 
+            if not success:
+                logger.error(f"Failed to update nickname for {interaction.user.name}. Error: {error_message}")
+                await interaction.response.send_message(error_message, ephemeral=True)
+                return
+
+            # Update registration with new emojis
+            success, message = await update_registration(
+                self,
+                interaction.user.name,
+                interaction.user.id,
+                formatted_name,
+                result[0],    # Keep existing T17 ID
+                None,         # Keep existing vote reminder setting
+                result[1],    # Keep existing clan tag
+                result[2],    # Keep existing T17 number
+                emojis       # Update emojis
+            )
+
+            if success:
+                logger.info(f"Successfully updated emojis for {interaction.user.name} to: {emojis}")
+                await interaction.response.send_message(
+                    f"Successfully updated your nickname with emojis: {formatted_name}",
+                    ephemeral=True
+                )
+            else:
+                logger.error(f"Failed to update registration for {interaction.user.name}. Error: {message}")
+                await interaction.response.send_message(message, ephemeral=True)
+
         except Exception as e:
-            logger.error(f"Error in name_emoji: {e}")
-            await interaction.response.send_message(
-                "An error occurred while updating your emojis.",
-                ephemeral=True
-            ) 
+            logger.error(f"Error in name_emoji for {interaction.user.name}: {str(e)}", exc_info=True)
+            await interaction.response.send_message("An error occurred while updating your emojis.", ephemeral=True) 
