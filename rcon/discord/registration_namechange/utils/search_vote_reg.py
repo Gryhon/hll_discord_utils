@@ -58,27 +58,43 @@ async def register_user(db_instance, user_name: str, user_id: int, nick_name: st
         logger.error(f"Unexpected error in register_user: {e}")
         return False, "An error occurred during registration"
 
-async def handle_autocomplete(interaction: discord.Interaction, player_name: str, in_loop_ref) -> List[app_commands.Choice[str]]:
-    """Handle autocomplete for player names"""
+async def handle_autocomplete(
+    interaction: discord.Interaction, 
+    current: str,
+    in_loop_ref: bool = False,
+    min_length: int = 2,
+    max_results: int = 25
+) -> List[app_commands.Choice[str]]:
+    """
+    Generic autocomplete handler for player names
+    
+    Args:
+        interaction: Discord interaction object
+        current: Current input string
+        in_loop_ref: Reference to prevent concurrent lookups
+        min_length: Minimum length of search string
+        max_results: Maximum number of results to return
+    """
     try:
         while in_loop_ref:
             await asyncio.sleep(1)
            
         in_loop_ref = True
-        name = player_name
-        multi_array = None
-
-        if len(name) >= 2:
-            logger.info(f"Search query: {name.replace(" ", "%")}")
-            multi_array = await query_player_database(name.replace(" ", "%"))
         
-        if multi_array is not None and len(multi_array) >= 1:
-            result = [
-                app_commands.Choice(name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {", ".join(player[1])}"[:100], value=player[0])
-                for player in multi_array
-            ]
-            in_loop_ref = False
-            return result
+        if len(current) >= min_length:
+            logger.info(f"Search query: {current.replace(' ', '%')}")
+            results = await query_player_database(current.replace(" ", "%"))
+            
+            if results is not None and len(results) >= 1:
+                choices = [
+                    app_commands.Choice(
+                        name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {', '.join(player[1])}"[:100],
+                        value=player[0]
+                    )
+                    for player in results[:max_results]
+                ]
+                in_loop_ref = False
+                return choices
         
         in_loop_ref = False
         return []
@@ -88,7 +104,7 @@ async def handle_autocomplete(interaction: discord.Interaction, player_name: str
         in_loop_ref = False
         return []
     finally:
-        in_loop_ref = False 
+        in_loop_ref = False
 
 async def get_player_name(t17_id: str) -> Optional[str]:
     """Get a player's name from their T17 ID."""
