@@ -16,73 +16,23 @@ logger = logging.getLogger(__name__)
 
 class Registration(commands.Cog, DiscordBase):
     def __init__(self, bot):
-        super().__init__()
         self.bot = bot
         self.in_Loop = False
+        DiscordBase.__init__(self)
 
-    @app_commands.command(name="voter_registration", description="Combine your Discord user with your T17 account")
+    @app_commands.command(
+        name="voter_registration",
+        description="Register your Discord account with your T17 account"
+    )
     @app_commands.describe(
         ingame_name="Choose your in game user",
-        vote_reminders="Would you like to receive vote reminders?"
+        vote_reminders="Enable/disable vote reminders (optional)"
     )
     async def voter_registration(
-        self, 
-        interaction: discord.Interaction, 
+        self,
+        interaction: discord.Interaction,
         ingame_name: str,
-        vote_reminders: bool = True
-    ):
-        try:
-            # Check if feature is enabled
-            if not config.get("rcon", 0, "name_change_registration", "enabled", default=True):
-                await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
-                return
-
-            success, message = await register_user(
-                self,
-                interaction.user.name,
-                interaction.user.id,
-                interaction.guild.get_member(interaction.user.id).nick,
-                ingame_name,
-                1 if vote_reminders else 0  # Use 1/0 for the votereg_ask_reg_cnt field
-            )
-            
-            if success:
-                # Assign role if configured
-                error_msg = await handle_roles(interaction.guild.get_member(interaction.user.id), 'registered')
-                if error_msg:
-                    message += f"\nNote: {error_msg}"
-                
-                # Send success embed
-                await send_success_embed(
-                    interaction.guild,
-                    interaction.user,
-                    'registered',
-                    interaction.guild.get_member(interaction.user.id).nick or interaction.user.name,
-                    ingame_name
-                )
-                
-            await interaction.response.send_message(message, ephemeral=True)
-            
-        except Exception as e:
-            logger.error(f"Unexpected error in voter_registration: {e}")
-            await interaction.response.send_message("An error occurred during registration.", ephemeral=True)
-
-    @voter_registration.autocomplete("ingame_name")
-    async def voter_autocomplete(self, interaction: discord.Interaction, player_name: str) -> List[app_commands.Choice[str]]:
-        return await handle_autocomplete(interaction, player_name, self.in_Loop) 
-
-    @app_commands.command(name="registration", description="Register your Discord account with your T17 account")
-    @app_commands.describe(
-        ingame_name="Choose your in game user",
-        t17_number="Your 4-digit T17 number (if required)",
-        clan_tag="Your clan tag (optional)"
-    )
-    async def registration(
-        self, 
-        interaction: discord.Interaction, 
-        ingame_name: str,
-        t17_number: Optional[str] = None,
-        clan_tag: Optional[str] = None
+        vote_reminders: Optional[bool] = True
     ):
         try:
             # Check if feature is enabled
@@ -103,7 +53,7 @@ class Registration(commands.Cog, DiscordBase):
                 interaction.user.id,
                 member.nick,
                 ingame_name,
-                1  # Default to vote reminders enabled
+                1 if vote_reminders else 0  # Convert bool to int for database
             )
             
             if success:
@@ -124,11 +74,11 @@ class Registration(commands.Cog, DiscordBase):
             await interaction.response.send_message(message, ephemeral=True)
 
         except Exception as e:
-            logger.error(f"Error in registration: {e}")
+            logger.error(f"Error in voter_registration: {e}")
             await interaction.response.send_message("An error occurred during registration.", ephemeral=True)
 
-    @registration.autocomplete("ingame_name")
-    async def registration_autocomplete(
+    @voter_registration.autocomplete("ingame_name")
+    async def voter_autocomplete(
         self,
         interaction: discord.Interaction,
         current: str
