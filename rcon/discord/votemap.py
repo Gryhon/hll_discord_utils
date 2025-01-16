@@ -500,20 +500,10 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.info("An error occurred while fetching the user.")
 
     async def send_Vote_Message(self, reminder=False):
+        """Send vote messages to players"""
         try:
-            # Check if map vote system is enabled
-            if not config.get("rcon", 0, "map_vote", 0, "enabled", default=True):
-                logger.info("Map vote system is disabled in config")
-                return
-
-            # Check if reminders are disabled (0 means disabled)
-            if reminder and config.get("rcon", 0, "map_vote", 0, "reminder", default=0) == 0:
-                logger.info("Vote reminders are disabled in config (reminder = 0)")
-                return
-
-            # Check if stealth vote is enabled
-            if config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
-                logger.info("Stealth vote is enabled, skipping reminders")
+            # Skip if stealth vote
+            if config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
                 return
 
             Text = ""
@@ -533,26 +523,15 @@ class VoteMap(commands.Cog, DiscordBase):
             players = await rcon.get_Players()
             
             for player in players.players: 
-                # Skip if player has voted
-                if voters is not None and player.player_id in voters:
-                    logger.info(f"Skipping reminder for {player.name} - already voted")
-                    continue
-
-                # Skip if player is registered and remind_registered_users is false
-                if not config.get("rcon", 0, "map_vote", 0, "remind_registered_users", default=False):
-                    reg = self.select_T17_Voter_Registration(player.player_id)
-                    if reg:
-                        logger.info(f"Skipping reminder for registered user {player.name}")
-                        continue
-
-                data = {
-                    "player_id": str(player.player_id), 
-                    "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)
-                }   
+                if voters is None or (player.player_id not in voters and 
+                    (config.get("rcon", 0, "map_vote", 0, "remind_registered_users", default=True) or 
+                    not self.select_T17_Voter_Registration(player.player_id))):
+                    data = None
+                    data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}   
                         
-                if not config.get("rcon", 0, "map_vote", 0, "dryrun", default=False):
-                    logger.debug(f"Sending vote message to {player.name}")
-                    await rcon.send_Player_Message(data)
+                    if data and not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
+                        if not config.get("rcon", 0, "map_vote", 0, "dryrun") or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
+                            await rcon.send_Player_Message(data)
 
         except Exception as e:
             logger.error(f"Error in send_Vote_Message: {e}")
