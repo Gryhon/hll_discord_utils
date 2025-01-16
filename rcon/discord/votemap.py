@@ -521,7 +521,10 @@ class VoteMap(commands.Cog, DiscordBase):
             players = await rcon.get_Players ()
             
             for player in players.players: 
-                if voters is None or player.player_id not in voters:
+                # Check if player has voted or (is registered and reminders are disabled for registered users)
+                if voters is None or (player.player_id not in voters and 
+                    (config.get("rcon", 0, "map_vote", 0, "remind_registered_users", default=True) or 
+                    not self.select_T17_Voter_Registration(player.player_id))):
                     data = None
                     data = {"player_id": str (player.player_id) , "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str (Text) }   
                         
@@ -530,7 +533,7 @@ class VoteMap(commands.Cog, DiscordBase):
                             logger.debug("Vote message: " + str (data)) 
                             await rcon.send_Player_Message (data)
                 else:
-                    logger.info (f"No reminder send to voter {player.name} ({player.player_id})")
+                    logger.info(f"No reminder send to voter {player.name} ({player.player_id})")
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
