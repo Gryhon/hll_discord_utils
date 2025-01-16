@@ -24,14 +24,18 @@ class UpdateName(commands.Cog, DiscordBase):
     @app_commands.describe(
         t17_number="Your 4-digit T17 number",
         clan_tag="Your clan tag (optional)",
-        vote_reminders="Enable/disable vote reminders (optional)"
+        vote_reminders="Would you like to receive vote reminders?"
     )
+    @app_commands.choices(vote_reminders=[
+        app_commands.Choice(name="Yes", value=1),
+        app_commands.Choice(name="No", value=0)
+    ])
     async def update_name(
         self, 
         interaction: discord.Interaction,
         t17_number: Optional[str] = None,
         clan_tag: Optional[str] = None,
-        vote_reminders: Optional[bool] = None
+        vote_reminders: Optional[app_commands.Choice[int]] = None
     ):
         try:
             # Check if feature is enabled
@@ -84,7 +88,7 @@ class UpdateName(commands.Cog, DiscordBase):
                 interaction.user.id,
                 formatted_name,
                 result[0],  # Keep existing T17 ID
-                vote_reminders if vote_reminders is not None else bool(result[4]),
+                vote_reminders.value if vote_reminders is not None else bool(result[4]),
                 clan_tag,
                 t17_number,
                 result[3]  # Keep existing emojis
