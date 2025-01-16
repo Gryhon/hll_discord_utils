@@ -634,8 +634,7 @@ class VoteMap(commands.Cog, DiscordBase):
             self.do_map_vote = False
             
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.do_map_vote = False
+            logger.error(f"Error in do_Map_Vote: {e}")
 
     async def background_task(self):
         try:
