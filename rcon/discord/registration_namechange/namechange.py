@@ -10,6 +10,7 @@ from .utils.search_vote_reg import query_player_database, register_user, get_pla
 from lib.config import config
 from .utils.name_utils import validate_t17_number, format_nickname, validate_clan_tag, validate_emojis
 from .utils.role_utils import handle_roles
+from .utils.message_utils import send_success_embed
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -117,15 +118,8 @@ class NameChange(commands.Cog, DiscordBase):
                             ephemeral=True
                         )
                 except discord.Forbidden:
-                    logger.error(f"Failed to update nickname for {interaction.user.name} - insufficient permissions")
                     await interaction.response.send_message(
-                        "Registration successful, but I don't have permission to update your nickname.", 
-                        ephemeral=True
-                    )
-                except discord.HTTPException as e:
-                    logger.error(f"HTTP error while updating nickname: {e}")
-                    await interaction.response.send_message(
-                        "Registration successful, but there was an error updating your nickname.", 
+                        "I don't have permission to change your nickname.",
                         ephemeral=True
                     )
             else:
@@ -136,7 +130,10 @@ class NameChange(commands.Cog, DiscordBase):
 
         except Exception as e:
             logger.error(f"Unexpected error in namechange: {e}")
-            await interaction.response.send_message("An error occurred while processing your request.", ephemeral=True)
+            await interaction.response.send_message(
+                "An error occurred while updating your nickname.",
+                ephemeral=True
+            )
 
     @namechange.autocomplete("ingame_name")
     async def namechange_autocomplete(self, interaction: discord.Interaction, player_name: str) -> List[app_commands.Choice[str]]:

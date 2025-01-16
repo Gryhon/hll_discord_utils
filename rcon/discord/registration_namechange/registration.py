@@ -6,6 +6,7 @@ from typing import List
 from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
+from lib.config import config
 from .utils.search_vote_reg import query_player_database, register_user
 from .utils.role_utils import handle_roles
 from .utils.message_utils import send_success_embed
@@ -25,6 +26,11 @@ class Registration(commands.Cog, DiscordBase):
     )
     async def voter_registration(self, interaction: discord.Interaction, ingame_name: str):
         try:
+            # Check if feature is enabled
+            if not config.get("comfort_functions", 0, "name_change_registration", "enabled", default=True):
+                await interaction.response.send_message("This feature is not enabled.", ephemeral=True)
+                return
+
             success, message = await register_user(
                 self,
                 interaction.user.name,
