@@ -30,7 +30,7 @@ class UpdateName(commands.Cog, DiscordBase):
         description="Update your Discord nickname to your latest in-game name"
     )
     @app_commands.describe(
-        t17_number=get_t17_description,
+        t17_number="Your 4-digit T17 number",
         clan_tag="Your clan tag (optional)",
         emojis="Your emojis (optional, max 3)"
     )
