@@ -26,6 +26,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.do_map_vote = False
         self.vote_map_active = True
         self.reset_Vote_Variables()
+        self.reminder_count = 0  # Add counter for reminders
         self.shutdown_event = asyncio.Event()
         self.seeding_message = ("\nImportant:\n\n"
                                 "    Vote function available when\n"
@@ -42,6 +43,8 @@ class VoteMap(commands.Cog, DiscordBase):
         self.loop_started = False  
 
     def reset_Vote_Variables(self):
+        if self.reminder_count > 0:
+            logger.info(f"Resetting vote variables. Sent {self.reminder_count} reminders this game")
         self.vote_msg = None
         self.vote_msg_id = None
         self.seeding_msg = None
@@ -52,10 +55,11 @@ class VoteMap(commands.Cog, DiscordBase):
         self.current_map = None
         self.Maps = None
         self.vote_results = []
-
+        self.reminder_count = 0
         self.last_execution = None
         self.send_seeding_message = True
         self.seeded = False
+        logger.debug("Vote variables reset")
 
     async def send_Pause_Message (self):
         try:
@@ -504,6 +508,7 @@ class VoteMap(commands.Cog, DiscordBase):
         try:
             # Skip if stealth vote
             if config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
+                logger.debug("Stealth vote enabled, skipping message")
                 return
 
             Text = ""
@@ -511,27 +516,43 @@ class VoteMap(commands.Cog, DiscordBase):
 
             if reminder and self.game_start:
                 voters = self.select_T17_Voter(self.game_start)
+                logger.debug(f"Found {len(voters) if voters else 0} existing voters")
 
             if not reminder:
                 for map in self.Maps.maps:
                     Text += str(map.pretty_name) + "\n"
+                logger.info("Preparing initial vote message with map list")
 
             elif reminder and len(self.vote_results):
                 for map in self.vote_results:
                     Text += str(map[0]) + " - " + str(map[1]) + " votes\n"
+                logger.debug("Preparing reminder message with current vote counts")
 
             players = await rcon.get_Players()
+            message_count = 0
             
-            for player in players.players: 
-                if voters is None or (player.player_id not in voters and 
-                    (config.get("rcon", 0, "map_vote", 0, "remind_registered_users", default=True) or 
-                    not self.select_T17_Voter_Registration(player.player_id))):
-                    data = None
-                    data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}   
-                        
-                    if data and not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
-                        if not config.get("rcon", 0, "map_vote", 0, "dryrun") or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
+            for player in players.players:
+                is_registered = self.select_T17_Voter_Registration(player.player_id)
+                wants_reminders = self.get_voter_reminder_preference(player.player_id)
+                
+                # Initial message (not a reminder)
+                if not reminder:
+                    if not is_registered or config.get("rcon", 0, "map_vote", 0, "initial_message_non_reminder_register_users", default=False):
+                        data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}
+                        if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
                             await rcon.send_Player_Message(data)
+                            message_count += 1
+                # Reminder message
+                elif is_registered and not wants_reminders:
+                    logger.debug(f"Skipping reminder for registered player who opted out: {player.name}")
+                    continue
+                elif voters is None or player.player_id not in voters:
+                    data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}
+                    if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
+                        await rcon.send_Player_Message(data)
+                        message_count += 1
+
+            logger.info(f"Sent {'initial message' if not reminder else 'reminder'} to {message_count} players")
 
         except Exception as e:
             logger.error(f"Error in send_Vote_Message: {e}")
@@ -608,21 +629,37 @@ class VoteMap(commands.Cog, DiscordBase):
                 # reminder
                 elif self.game_active and self.vote_active:
                     reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0)
+                    max_reminders = config.get("rcon", 0, "map_vote", 0, "max_reminders_per_game", default=0)
                     
-                    # Skip reminders if disabled
+                    # Log reminder settings
+                    logger.debug(f"Reminder check - Interval: {reminder_interval}m, Max: {max_reminders}, Current count: {self.reminder_count}")
+                    
+                    # Skip if reminders disabled
                     if reminder_interval == 0:
+                        logger.debug("Reminders disabled (interval = 0)")
+                        return
+                        
+                    # Skip if max reached
+                    if max_reminders > 0 and self.reminder_count >= max_reminders:
+                        logger.info(f"Max reminders reached ({max_reminders}), skipping reminder")
                         return
                         
                     if not self.last_execution:
                         self.last_execution = time.time()
+                        logger.debug("Initializing last execution time")
 
                     current_time = time.time()
+                    time_since_last = (current_time - self.last_execution) / 60  # Convert to minutes
 
-                    if (current_time - self.last_execution) >= (reminder_interval * 60):
-                        logger.info("Send reminder")
+                    if time_since_last >= reminder_interval:
+                        logger.info(f"Sending reminder {self.reminder_count + 1}/{max_reminders if max_reminders > 0 else 'unlimited'}")
                         if not config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
-                            await self.send_Vote_Message(True)
+                            await self.send_Vote_Message(reminder=True)
+                            self.reminder_count += 1
+                            logger.info(f"Reminder sent successfully. Next reminder in {reminder_interval} minutes")
                         self.last_execution = current_time
+                    else:
+                        logger.debug(f"Not time for reminder yet. {round(reminder_interval - time_since_last, 1)} minutes remaining")
 
                 if not self.send_seeding_message:
                     self.send_seeding_message = True
@@ -762,27 +799,3 @@ class VoteMap(commands.Cog, DiscordBase):
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-
-    async def vote_timer(self):
-        """Timer for vote reminders and vote end"""
-        try:
-            last_reminder = 0
-            while True:
-                # Only process if voting is active
-                if self.vote_active:
-                    reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0)
-                    current_time = time.time()
-
-                    # Only send reminder if interval has passed and reminders are enabled
-                    if reminder_interval > 0 and (current_time - last_reminder) >= (reminder_interval * 60):
-                        await self.send_Vote_Message(reminder=True)
-                        last_reminder = current_time
-                        logger.debug(f"Sent vote reminder, next reminder in {reminder_interval} minutes")
-                    else:
-                        logger.debug("Skipping reminder - interval not reached or reminders disabled")
-
-                # Wait before next check (60 seconds is more reasonable)
-                await asyncio.sleep(60)
-
-        except Exception as e:
-            logger.error(f"Error in vote timer: {e}")

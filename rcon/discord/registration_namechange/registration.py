@@ -26,11 +26,11 @@ class Registration(commands.Cog, DiscordBase):
     )
     @app_commands.describe(
         ingame_name="Choose your in game user",
-        vote_reminders="Would you like to receive vote reminders?"
+        vote_reminders="Choose your vote reminder preference"
     )
     @app_commands.choices(vote_reminders=[
-        app_commands.Choice(name="Yes", value=1),
-        app_commands.Choice(name="No", value=0)
+        app_commands.Choice(name="Remind me if I haven't voted yet", value=1),
+        app_commands.Choice(name="No vote reminders", value=0)
     ])
     async def voter_registration(
         self,
