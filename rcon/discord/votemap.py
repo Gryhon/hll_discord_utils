@@ -566,9 +566,9 @@ class VoteMap(commands.Cog, DiscordBase):
     async def do_Map_Vote (self):
         try:
             self.do_map_vote = True
-
-            await self.get_Game_State ()
-            server_status = await rcon.get_Server_Status ()
+            
+            await self.get_Game_State()
+            server_status = await rcon.get_Server_Status()
             
             if server_status is not None:
                 if server_status.current_players >= config.get("rcon", 0, "map_vote", 0, "activate_vote") and not self.seeded:
@@ -607,12 +607,18 @@ class VoteMap(commands.Cog, DiscordBase):
 
                 # reminder
                 elif self.game_active and self.vote_active:
+                    reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0)
+                    
+                    # Skip reminders if disabled
+                    if reminder_interval == 0:
+                        return
+                        
                     if not self.last_execution:
                         self.last_execution = time.time()
 
                     current_time = time.time()
 
-                    if (current_time - self.last_execution) >= (config.get("rcon", 0, "map_vote", 0, "reminder") * 60):
+                    if (current_time - self.last_execution) >= (reminder_interval * 60):
                         logger.info("Send reminder")
                         if not config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
                             await self.send_Vote_Message(True)

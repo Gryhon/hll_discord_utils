@@ -348,10 +348,11 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-    def insert_Voter (self, start, player, discord_user_id, map_name):
+    def insert_Voter(self, start, player, discord_user_id, map_name):
         try:
-            # Insert the message ID in the database
-            self.cursor.execute('INSERT INTO voter (vot_votmap_start, vot_player, vot_dis_user_id, vot_map_name) VALUES (?, ?, ?, ?)', (int (start), player, discord_user_id, map_name))
+            # Insert the message ID in the database - start should be int, player_id stays as string
+            self.cursor.execute('INSERT INTO voter (vot_votmap_start, vot_player, vot_dis_user_id, vot_map_name) VALUES (?, ?, ?, ?)', 
+                              (int(start), str(player), str(discord_user_id), str(map_name)))
             self.conn.commit()  
 
         except sqlite3.OperationalError as e:
@@ -359,10 +360,11 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-    def deleter_Voter (self, start, player, map_name):
+    def deleter_Voter(self, start, player, map_name):
         try:
-            # Delete a vote
-            self.cursor.execute("DELETE FROM voter WHERE vot_votmap_start = ? AND vot_player = ? AND vot_map_name = ?", (int (start), player, map_name))
+            # Delete a vote - start should be int, player stays as string
+            self.cursor.execute("DELETE FROM voter WHERE vot_votmap_start = ? AND vot_player = ? AND vot_map_name = ?", 
+                              (int(start), str(player), str(map_name)))
             self.conn.commit()
 
         except sqlite3.OperationalError as e:
