@@ -46,31 +46,6 @@ class NameEmoji(commands.Cog, DiscordBase):
         parts = name.split('🎖️', 1)[0].split('⚔️', 1)[0].split('🛡️', 1)[0].split('⭐', 1)[0].split('🎮', 1)[0]
         return parts[0].rstrip()
 
-    async def update_nickname_with_emojis(self, member: discord.Member, emojis: Optional[str]) -> Tuple[bool, str]:
-        """Update nickname with new emojis while preserving the base name."""
-        try:
-            current_name = member.nick or member.name
-            base_name = self.strip_emojis(current_name)
-            
-            # Create new name with emojis
-            new_name = base_name
-            if emojis:
-                new_name = f"{base_name} {emojis}"
-            
-            # Ensure name doesn't exceed Discord's 32-character limit
-            if len(new_name) > 32:
-                new_name = new_name[:32]
-                
-            # Update nickname
-            await member.edit(nick=new_name)
-            return True, new_name
-            
-        except discord.Forbidden:
-            return False, "I don't have permission to update nicknames."
-        except Exception as e:
-            logger.error(f"Error updating nickname: {e}")
-            return False, "Failed to update nickname."
-
     @app_commands.command(
         name="name-emoji",
         description="Update the emojis in your Discord nickname (up to 5 Unicode emojis)"
