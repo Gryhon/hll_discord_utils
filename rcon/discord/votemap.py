@@ -25,7 +25,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.in_Loop = False
         self.do_map_vote = False
         self.vote_map_active = True
-        self.reset_Vote_Variables()
+        self.reminder_count = 0  # Add counter for reminders
         self.shutdown_event = asyncio.Event()
         self.seeding_message = ("\nImportant:\n\n"
                                 "    Vote function available when\n"
@@ -40,8 +40,11 @@ class VoteMap(commands.Cog, DiscordBase):
         self.vote_channel_id = config.get("rcon", 0, "map_vote", 0, "vote_channel_id") 
         self.vote_channel = None   
         self.loop_started = False  
+        self.reset_Vote_Variables()
 
     def reset_Vote_Variables(self):
+        if self.reminder_count > 0:
+            logger.info(f"Resetting vote variables. Sent {self.reminder_count} reminders this game")
         self.vote_msg = None
         self.vote_msg_id = None
         self.seeding_msg = None
@@ -52,10 +55,11 @@ class VoteMap(commands.Cog, DiscordBase):
         self.current_map = None
         self.Maps = None
         self.vote_results = []
-
+        self.reminder_count = 0
         self.last_execution = None
         self.send_seeding_message = True
         self.seeded = False
+        logger.debug("Vote variables reset")
 
     async def send_Pause_Message (self):
         try:
@@ -441,7 +445,7 @@ class VoteMap(commands.Cog, DiscordBase):
             self.vote_active = await self.check_Active_Vote ()
 
             if not self.vote_active:
-                topic = "Vote for the next map:"                
+                topic = "Vote for the next map:"
 
                 await self.get_Game_State ()
 
@@ -499,38 +503,59 @@ class VoteMap(commands.Cog, DiscordBase):
         except discord.HTTPException:
             logger.info("An error occurred while fetching the user.")
 
-    async def send_Vote_Message (self, reminder=False):
+    async def send_Vote_Message(self, reminder=False):
+        """Send vote messages to players"""
         try:
+            # Skip if stealth vote
+            if config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
+                logger.debug("Stealth vote enabled, skipping message")
+                return
+
             Text = ""
             voters = None
 
             if reminder and self.game_start:
-                voters = self.select_T17_Voter (self.game_start)
+                voters = self.select_T17_Voter(self.game_start)
+                logger.debug(f"Found {len(voters) if voters else 0} existing voters")
 
             if not reminder:
                 for map in self.Maps.maps:
-                    Text += str (map.pretty_name) + "\n"
+                    Text += str(map.pretty_name) + "\n"
+                logger.info("Preparing initial vote message with map list")
 
-            elif reminder and len (self.vote_results):
+            elif reminder and len(self.vote_results):
                 for map in self.vote_results:
-                    Text += str (map[0]) + " - " + str (map[1]) + " votes\n"
+                    Text += str(map[0]) + " - " + str(map[1]) + " votes\n"
+                logger.debug("Preparing reminder message with current vote counts")
 
-            players = await rcon.get_Players ()
+            players = await rcon.get_Players()
+            message_count = 0
             
-            for player in players.players: 
-                if voters is None or player.player_id not in voters:
-                    data = None
-                    data = {"player_id": str (player.player_id) , "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str (Text) }   
-                        
-                    if data and config.get("rcon", 0, "map_vote", 0, "stealth_vote") == False:
-                        if not (config.get("rcon", 0, "map_vote", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
-                            logger.debug("Vote message: " + str (data)) 
-                            await rcon.send_Player_Message (data)
-                else:
-                    logger.info (f"No reminder send to voter {player.name} ({player.player_id})")
+            for player in players.players:
+                is_registered = self.select_T17_Voter_Registration(player.player_id)
+                wants_reminders = self.get_voter_reminder_preference(player.player_id)
+                
+                # Initial message (not a reminder)
+                if not reminder:
+                    if not is_registered or config.get("rcon", 0, "map_vote", 0, "initial_message_non_reminder_register_users", default=False):
+                        data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}
+                        if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
+                            await rcon.send_Player_Message(data)
+                            message_count += 1
+                # Reminder message
+                elif is_registered and not wants_reminders:
+                    logger.debug(f"Skipping reminder for registered player who opted out: {player.name}")
+                    continue
+                elif voters is None or player.player_id not in voters:
+                    data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}
+                    if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
+                        await rcon.send_Player_Message(data)
+                        message_count += 1
+
+            logger.info(f"Sent {'initial message' if not reminder else 'reminder'} to {message_count} players")
 
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
+            logger.error(f"Error in send_Vote_Message: {e}")
             
     async def check_Origin_Map_Rotation (self):
         try:
@@ -562,9 +587,9 @@ class VoteMap(commands.Cog, DiscordBase):
     async def do_Map_Vote (self):
         try:
             self.do_map_vote = True
-
-            await self.get_Game_State ()
-            server_status = await rcon.get_Server_Status ()
+            
+            await self.get_Game_State()
+            server_status = await rcon.get_Server_Status()
             
             if server_status is not None:
                 if server_status.current_players >= config.get("rcon", 0, "map_vote", 0, "activate_vote") and not self.seeded:
@@ -603,16 +628,38 @@ class VoteMap(commands.Cog, DiscordBase):
 
                 # reminder
                 elif self.game_active and self.vote_active:
+                    reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0)
+                    max_reminders = config.get("rcon", 0, "map_vote", 0, "max_reminders_per_game", default=0)
+                    
+                    # Log reminder settings
+                    logger.debug(f"Reminder check - Interval: {reminder_interval}m, Max: {max_reminders}, Current count: {self.reminder_count}")
+                    
+                    # Skip if reminders disabled
+                    if reminder_interval == 0:
+                        logger.debug("Reminders disabled (interval = 0)")
+                        return
+                        
+                    # Skip if max reached
+                    if max_reminders > 0 and self.reminder_count >= max_reminders:
+                        logger.info(f"Max reminders reached ({max_reminders}), skipping reminder")
+                        return
+                        
                     if not self.last_execution:
                         self.last_execution = time.time()
+                        logger.debug("Initializing last execution time")
 
                     current_time = time.time()
+                    time_since_last = (current_time - self.last_execution) / 60  # Convert to minutes
 
-                    if (current_time - self.last_execution) >= (config.get("rcon", 0, "map_vote", 0, "reminder") * 60):
-                        logger.info("Send reminder")
+                    if time_since_last >= reminder_interval:
+                        logger.info(f"Sending reminder {self.reminder_count + 1}/{max_reminders if max_reminders > 0 else 'unlimited'}")
                         if not config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
-                            await self.send_Vote_Message(True)
+                            await self.send_Vote_Message(reminder=True)
+                            self.reminder_count += 1
+                            logger.info(f"Reminder sent successfully. Next reminder in {reminder_interval} minutes")
                         self.last_execution = current_time
+                    else:
+                        logger.debug(f"Not time for reminder yet. {round(reminder_interval - time_since_last, 1)} minutes remaining")
 
                 if not self.send_seeding_message:
                     self.send_seeding_message = True
@@ -628,8 +675,7 @@ class VoteMap(commands.Cog, DiscordBase):
             self.do_map_vote = False
             
         except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.do_map_vote = False
+            logger.error(f"Error in do_Map_Vote: {e}")
 
     async def background_task(self):
         try:
@@ -739,62 +785,6 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
             return None
     
-    @app_commands.command(name="voter_registration", description="Combine you Discord user with you T17 account")
-    @app_commands.describe(
-        ingame_name="Choose you in game user",
-    )
-    async def voter_registration(self, interaction: discord.Interaction, ingame_name: str):
-        user_name = interaction.user.name
-        user_id = interaction.user.id 
-        nick_name = interaction.guild.get_member(user_id).nick
-
-        player_id = self.select_T17_Voter_Registration (user_id)
-
-        if player_id == None:
-
-            # verify that that ingame_name is a T17 ID
-            if bool (re.fullmatch(r"[0-9a-fA-F]{32}", ingame_name)) == False:
-                await interaction.response.send_message('''Something went wrong, please select your name from the\n'''
-                                                        '''list and do not add or remove any characters,\n'''
-                                                        '''after the selection.''', ephemeral=True)
-            else:
-                self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, 0, 0)
-                await interaction.response.send_message("You are now registered", ephemeral=True)
-
-        else:
-            await interaction.response.send_message("You are already registered. If it was't you, please contacht @Techsupport!", ephemeral=True)
-
-    @voter_registration.autocomplete("ingame_name")
-    async def voter_autocomplete(self, interaction: discord.Interaction, player_name: str) -> List[app_commands.Choice[str]]:
-        try:
-            while self.in_Loop:
-                await asyncio.sleep (1)
-           
-            self.in_Loop = True
-            name = player_name
-            multi_array = None
-
-            if len (name) >= 2:
-                logger.info (f"Search query: {name.replace(" ", "%")}")
-
-                multi_array = await self.query_Player_Database(name.replace(" ", "%"))
-        
-            if multi_array is not None and len (multi_array) >= 1:
-                result = [
-                    app_commands.Choice(name=f"Last: {datetime.fromtimestamp(player[3]/1000).strftime('%Y-%m-%d')} - {", ".join(player[1])}"[:100], value=player[0])
-                    for player in multi_array
-                ]
-                self.in_Loop = False
-                return result
-            else:
-                self.in_Loop = False
-                return []
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.in_Loop = False
-            return []
-
     @commands.Cog.listener()
     async def on_raw_poll_vote_remove(self, payload):
         try:
