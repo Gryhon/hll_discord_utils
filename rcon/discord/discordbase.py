@@ -404,7 +404,8 @@ class DiscordBase:
 
     def select_T17_Voter_Registration(self, discord_user_id):
         try:
-            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt FROM voter_register WHERE votreg_dis_user_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (int(discord_user_id),))
+            # Look up by T17 ID instead of Discord user ID
+            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt FROM voter_register WHERE votreg_t17_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (str(discord_user_id),))
             result = self.cursor.fetchone()
             return result if result else None
 
