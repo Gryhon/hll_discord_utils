@@ -13,6 +13,7 @@ from discord.ext import commands
 from discord import app_commands
 from lib.config import config
 from datetime import timedelta, datetime
+from rcon.discord.registration_namechange.registration import Registration
 
 
 # get Logger for this modul
