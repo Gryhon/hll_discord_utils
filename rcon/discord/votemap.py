@@ -340,7 +340,7 @@ class VoteMap(commands.Cog, DiscordBase):
                 voters = item[2]
 
                 for voter in voters:
-                    self.insert_Voter (self.game_start, voter.id, voter.name, item[0])
+                    self.insert_Voter (self.game_start, voter.name, voter.id, item[0])
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
