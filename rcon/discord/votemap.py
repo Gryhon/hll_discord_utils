@@ -532,7 +532,7 @@ class VoteMap(commands.Cog, DiscordBase):
             message_count = 0
             
             for player in players.players:
-                registration = self.select_T17_Voter_Registration(player.player_id)
+                registration = self.select_T17_Voter_Registration_By_T17ID(player.player_id)
                 wants_reminders = True  # Default to True for unregistered players
                 
                 if registration:
