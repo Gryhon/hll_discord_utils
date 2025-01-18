@@ -12,7 +12,6 @@ from rcon.discord.autolevel import AutoLevel
 from rcon.discord.comfort import Comfort
 from rcon.discord.registration_namechange import Registration, NameChange, Unregister, UpdateName
 from rcon.discord.registration_namechange.name_emoji import NameEmoji
-from rcon.discord.registration_namechange.registration import Registration
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
