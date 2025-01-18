@@ -10,6 +10,8 @@ from rcon.discord.balance import Balance
 from rcon.discord.votemap import VoteMap
 from rcon.discord.autolevel import AutoLevel
 from rcon.discord.comfort import Comfort
+from rcon.discord.registration_namechange import Registration, NameChange, Unregister, UpdateName
+from rcon.discord.registration_namechange.name_emoji import NameEmoji
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -52,7 +54,12 @@ class MainBot(commands.Bot):
 
         if (config.get("rcon", 0, "comfort_functions", 0, "enabled")):
             logger.info ("Start comfort functions")
-            await self.add_cog(Comfort(self)) 
+            await self.add_cog(Comfort(self))
+            await self.add_cog(Registration(self))
+            await self.add_cog(NameChange(self))
+            await self.add_cog(Unregister(self))
+            await self.add_cog(UpdateName(self))
+            await self.add_cog(NameEmoji(self))
             
         await self.tree.sync()
         logger.info ("Slash commands have been synced.")
