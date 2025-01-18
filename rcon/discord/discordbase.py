@@ -96,21 +96,13 @@ class DiscordBase:
             votreg_dis_user_id INTEGER UNIQUE,
             votreg_dis_nick TEXT,
             votreg_t17_id TEXT,
-            votereg_ask_reg_cnt INTEGER,
-            votereg_not_ingame_cnt INTEGER,
-            votreg_clan_tag TEXT,
-            votreg_t17_number TEXT,
-            votreg_emojis TEXT,
-            votreg_display_format TEXT                                                         
+            votereg_ask_reg_cnt INTEGER DEFAULT 0,
+            votereg_not_ingame_cnt INTEGER DEFAULT 0,
+            votreg_last_updated INTEGER,
+            votreg_vote_reminders BOOLEAN DEFAULT TRUE                                                      
         )
         ''')
-        self.conn.commit()  
-
-        # Add new columns using existing helper method
-        self.ensure_column_exists("voter_register", "votreg_clan_tag", "TEXT")
-        self.ensure_column_exists("voter_register", "votreg_t17_number", "TEXT")
-        self.ensure_column_exists("voter_register", "votreg_emojis", "TEXT")
-        self.ensure_column_exists("voter_register", "votreg_display_format", "TEXT")
+        self.conn.commit()
 
     def create_Balance_Table(self):
         # Creates the table if it does not yet exist
@@ -348,11 +340,10 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-    def insert_Voter(self, start, player, discord_user_id, map_name):
+    def insert_Voter (self, start, player, discord_user_id, map_name):
         try:
-            # Insert the message ID in the database - start should be int, player_id stays as string
-            self.cursor.execute('INSERT INTO voter (vot_votmap_start, vot_player, vot_dis_user_id, vot_map_name) VALUES (?, ?, ?, ?)', 
-                              (int(start), str(player), str(discord_user_id), str(map_name)))
+            # Insert the message ID in the database
+            self.cursor.execute('INSERT INTO voter (vot_votmap_start, vot_player, vot_dis_user_id, vot_map_name) VALUES (?, ?, ?, ?)', (int (start), player, discord_user_id, map_name))
             self.conn.commit()  
 
         except sqlite3.OperationalError as e:
@@ -360,11 +351,10 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-    def deleter_Voter(self, start, player, map_name):
+    def deleter_Voter (self, start, player, map_name):
         try:
-            # Delete a vote - start should be int, player stays as string
-            self.cursor.execute("DELETE FROM voter WHERE vot_votmap_start = ? AND vot_player = ? AND vot_map_name = ?", 
-                              (int(start), str(player), str(map_name)))
+            # Delete a vote
+            self.cursor.execute("DELETE FROM voter WHERE vot_votmap_start = ? AND vot_player = ? AND vot_map_name = ?", (int (start), player, map_name))
             self.conn.commit()
 
         except sqlite3.OperationalError as e:
@@ -383,29 +373,22 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-    def insert_Voter_Registration(self, discord_user, discord_user_id, discord_nick, player_id, register_cnt, not_ingame_cnt, clan_tag=None, t17_number=None, emojis=None, display_format=None):
+    def insert_Voter_Registration (self, discord_user, discord_user_id, discord_nick, player_id, register_cnt, not_ingame_cnt):
         try:
-            # Try update first
-            self.cursor.execute('UPDATE voter_register SET votreg_dis_user = ?, votreg_dis_nick = ?, votreg_t17_id = ?, votereg_ask_reg_cnt = ?, votereg_not_ingame_cnt = ?, votreg_clan_tag = ?, votreg_t17_number = ?, votreg_emojis = ?, votreg_display_format = ? WHERE votreg_dis_user_id = ?', 
-                (str(discord_user), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format, int(discord_user_id)))
-            
-            # If no update happened, do insert
-            if self.cursor.rowcount == 0:
-                self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
-                    (str(discord_user), int(discord_user_id), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format))
-            
+            # Insert the message ID in the database
+            self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt) VALUES (?, ?, ?, ?, ?, ?)', (str (discord_user), int (discord_user_id), str (discord_nick), str (player_id), int(register_cnt), int (not_ingame_cnt)))
             self.conn.commit()  
 
         except sqlite3.OperationalError as e:
             logger.error(f"SQLite OperationalError: {e}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-
-    def select_T17_Voter_Registration(self, discord_user_id):
+        
+    def select_T17_Voter_Registration (self, discord_user_id):
         try:
-            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt FROM voter_register WHERE votreg_dis_user_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (int(discord_user_id),))
+            self.cursor.execute('SELECT votreg_t17_id FROM voter_register WHERE votreg_dis_user_id = (?) ORDER BY votreg_seqno DESC LIMIT 1', (int (discord_user_id),))
             result = self.cursor.fetchone()
-            return result if result else None
+            return result[0] if result else None
 
         except sqlite3.OperationalError as e:
             logger.error(f"SQLite OperationalError: {e}")
@@ -429,19 +412,42 @@ class DiscordBase:
             logger.error(f"Unexpected error: {e}")
             return None
 
-    def delete_T17_Voter_Registration(self, discord_user_id):
-        """Delete a user's registration from the database."""
+    def get_User_Name(self, discord_user_id):
+        """Get registered username for Discord user"""
         try:
-            self.cursor.execute(
-                'DELETE FROM voter_register WHERE votreg_dis_user_id = ?',
-                (int(discord_user_id),)
-            )
-            self.conn.commit()
-            return True
+            self.cursor.execute('SELECT votreg_dis_user FROM voter_register WHERE votreg_dis_user_id = ?', 
+                              (int(discord_user_id),))
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except sqlite3.Error as e:
+            logger.error(f"Database error in get_User_Name: {e}")
+            return None
 
-        except sqlite3.OperationalError as e:
-            logger.error(f"SQLite OperationalError: {e}")
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return False
+    def get_User_Registration(self, discord_user_id):
+        """Get full registration info for Discord user"""
+        try:
+            self.cursor.execute('''
+                SELECT votreg_dis_user, votreg_dis_nick, votreg_t17_id, 
+                       votereg_last_updated, votreg_vote_reminders
+                FROM voter_register 
+                WHERE votreg_dis_user_id = ?
+            ''', (int(discord_user_id),))
+            return self.cursor.fetchone()
+        except sqlite3.Error as e:
+            logger.error(f"Database error in get_User_Registration: {e}")
+            return None
+
+    def search_Players(self, query: str) -> list:
+        """Search for players in voter register"""
+        try:
+            self.cursor.execute('''
+                SELECT DISTINCT votreg_t17_id 
+                FROM voter_register 
+                WHERE votreg_t17_id LIKE ? 
+                LIMIT 25
+            ''', (f'%{query}%',))
+            results = self.cursor.fetchall()
+            return [r[0] for r in results] if results else []
+        except sqlite3.Error as e:
+            logger.error(f"Database error in search_Players: {e}")
+            return []
