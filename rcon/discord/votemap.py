@@ -340,7 +340,7 @@ class VoteMap(commands.Cog, DiscordBase):
                 voters = item[2]
 
                 for voter in voters:
-                    self.insert_Voter (self.game_start, voter.id, voter.name, item[0])
+                    self.insert_Voter (self.game_start, voter.name, voter.id, item[0])
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -532,18 +532,21 @@ class VoteMap(commands.Cog, DiscordBase):
             message_count = 0
             
             for player in players.players:
-                is_registered = self.select_T17_Voter_Registration(player.player_id)
-                wants_reminders = self.get_voter_reminder_preference(player.player_id)
+                registration = self.select_T17_Voter_Registration_By_T17ID(player.player_id)
+                wants_reminders = True  # Default to True for unregistered players
+                
+                if registration:
+                    wants_reminders = bool(registration[4]) if len(registration) > 4 else True
                 
                 # Initial message (not a reminder)
                 if not reminder:
-                    if not is_registered or config.get("rcon", 0, "map_vote", 0, "initial_message_non_reminder_register_users", default=False):
+                    if not registration or config.get("rcon", 0, "map_vote", 0, "initial_message_non_reminder_register_users", default=False):
                         data = {"player_id": str(player.player_id), "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str(Text)}
                         if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", default=False):
                             await rcon.send_Player_Message(data)
                             message_count += 1
                 # Reminder message
-                elif is_registered and not wants_reminders:
+                elif registration and not wants_reminders:
                     logger.debug(f"Skipping reminder for registered player who opted out: {player.name}")
                     continue
                 elif voters is None or player.player_id not in voters:

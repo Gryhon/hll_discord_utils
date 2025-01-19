@@ -350,9 +350,10 @@ class DiscordBase:
 
     def insert_Voter(self, start, player, discord_user_id, map_name):
         try:
-            # Insert the message ID in the database - start should be int, player_id stays as string
+            # Ensure discord_user_id is int, handle string conversion if needed
+            user_id = int(discord_user_id) if isinstance(discord_user_id, str) else discord_user_id
             self.cursor.execute('INSERT INTO voter (vot_votmap_start, vot_player, vot_dis_user_id, vot_map_name) VALUES (?, ?, ?, ?)', 
-                              (int(start), str(player), str(discord_user_id), str(map_name)))
+                              (int(start), str(player), user_id, str(map_name)))
             self.conn.commit()  
 
         except sqlite3.OperationalError as e:
@@ -414,9 +415,23 @@ class DiscordBase:
             logger.error(f"Unexpected error: {e}")
             return None
 
+    def select_T17_Voter_Registration_By_T17ID(self, t17_id):
+        try:
+            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt FROM voter_register WHERE votreg_t17_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (str(t17_id),))
+            result = self.cursor.fetchone()
+            return result if result else None
+
+        except sqlite3.OperationalError as e:
+            logger.error(f"SQLite OperationalError: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
     def select_T17_Voter (self, start_map):
         try:
-            self.cursor.execute('select votreg_t17_id from voter, voter_register WHERE vot_dis_user_id = votreg_dis_user_id AND vot_votmap_start = (?);', (int (start_map),))
+            # Cast vot_dis_user_id to INTEGER for consistent join with votreg_dis_user_id
+            self.cursor.execute('select votreg_t17_id from voter, voter_register WHERE CAST(vot_dis_user_id AS INTEGER) = votreg_dis_user_id AND vot_votmap_start = (?);', (int (start_map),))
             result = self.cursor.fetchall()
             voters = [row[0] for row in result]
 
@@ -445,3 +460,19 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return False
+
+    def get_voter_reminder_preference(self, user_id):
+        try:
+            result = self.select_T17_Voter_Registration(user_id)
+            
+            if result and len(result) > 4:
+                return bool(result[4])
+            
+            return True
+
+        except sqlite3.OperationalError as e:
+            logger.error(f"SQLite OperationalError: {e}")
+            return True
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return True
