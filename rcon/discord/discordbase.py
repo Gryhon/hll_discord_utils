@@ -18,6 +18,7 @@ class DiscordBase:
         self.migrate_Map_Vote_Table()
         self.create_Balance_Table()
         self.create_Voter_Table()
+        self.migrate_Voter_Register_Table()
         self.create_Voter_Register_Table()
         self.create_Inappropriate_Name_Table()
         self.create_Key_Value()
@@ -87,6 +88,67 @@ class DiscordBase:
 
         self.ensure_column_exists ("voter", "vot_dis_user_id", "INTEGER")
 
+    def migrate_Voter_Register_Table(self):
+        
+        # Migrate the table structure
+        try:
+            if self.column_exists ("voter_register", "votereg_ask_reg_cnt"):
+                
+                if self.column_exists ("voter_register", "votreg_clan_tag"):
+                    self.cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS temp_voter_register (
+                        votreg_seqno INTEGER PRIMARY KEY AUTOINCREMENT,
+                        votreg_dis_user TEXT,
+                        votreg_dis_user_id INTEGER UNIQUE,
+                        votreg_dis_nick TEXT,
+                        votreg_t17_id TEXT,
+                        votreg_ask_reg_cnt INTEGER,
+                        votreg_not_ingame_cnt INTEGER,
+                        votreg_clan_tag TEXT,
+                        votreg_t17_number TEXT,
+                        votreg_emojis TEXT,
+                        votreg_display_format TEXT                                                         
+                    )
+                    ''')
+
+                    self.cursor.execute('''
+                        INSERT INTO temp_voter_register (votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votreg_ask_reg_cnt, votreg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format)                
+                        SELECT votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format
+                        FROM voter_register
+                    ''')
+
+                else:
+                    self.cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS temp_voter_register (
+                        votreg_seqno INTEGER PRIMARY KEY AUTOINCREMENT,
+                        votreg_dis_user TEXT,
+                        votreg_dis_user_id INTEGER UNIQUE,
+                        votreg_dis_nick TEXT,
+                        votreg_t17_id TEXT,
+                        votreg_ask_reg_cnt INTEGER,
+                        votreg_not_ingame_cnt INTEGER                                                      
+                    )
+                    ''')
+                    
+                    self.cursor.execute('''
+                        INSERT INTO temp_voter_register (votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votreg_ask_reg_cnt, votreg_not_ingame_cnt)                
+                        SELECT votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt
+                        FROM voter_register
+                    ''')
+
+                    query = f"UPDATE temp_voter_register SET votreg_ask_reg_cnt = 1 WHERE votreg_ask_reg_cnt = 0"
+                    self.cursor.execute(query)
+                
+                self.cursor.execute('DROP TABLE voter_register')
+
+                self.cursor.execute('ALTER TABLE temp_voter_register RENAME TO voter_register')
+
+                self.conn.commit()
+
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Failed to update voter_register: {e}")
+              
     def create_Voter_Register_Table(self):
         # Creates the table if it does not yet exist
         self.cursor.execute('''
@@ -96,8 +158,8 @@ class DiscordBase:
             votreg_dis_user_id INTEGER UNIQUE,
             votreg_dis_nick TEXT,
             votreg_t17_id TEXT,
-            votereg_ask_reg_cnt INTEGER,
-            votereg_not_ingame_cnt INTEGER,
+            votreg_ask_reg_cnt INTEGER,
+            votreg_not_ingame_cnt INTEGER,
             votreg_clan_tag TEXT,
             votreg_t17_number TEXT,
             votreg_emojis TEXT,
@@ -106,11 +168,17 @@ class DiscordBase:
         ''')
         self.conn.commit()  
 
-        # Add new columns using existing helper method
-        self.ensure_column_exists("voter_register", "votreg_clan_tag", "TEXT")
-        self.ensure_column_exists("voter_register", "votreg_t17_number", "TEXT")
-        self.ensure_column_exists("voter_register", "votreg_emojis", "TEXT")
-        self.ensure_column_exists("voter_register", "votreg_display_format", "TEXT")
+        # Migrate the table to add new features
+        try:
+# Add new columns using existing helper method
+            self.ensure_column_exists("voter_register", "votreg_clan_tag", "TEXT")
+            self.ensure_column_exists("voter_register", "votreg_t17_number", "TEXT")
+            self.ensure_column_exists("voter_register", "votreg_emojis", "TEXT")
+            self.ensure_column_exists("voter_register", "votreg_display_format", "TEXT")
+        
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Failed to update voter_register: {e}")
 
     def create_Balance_Table(self):
         # Creates the table if it does not yet exist
@@ -164,10 +232,10 @@ class DiscordBase:
                 return True
         
         except sqlite3.OperationalError as e:
-            print(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
+            return False
 
     def ensure_column_exists(self, table_name, column_name, column_type):
-       
         try:
             if not self.column_exists(table_name, column_name):
                 self.cursor.execute(f"ALTER TABLE {table_name} ADD COLUMN {column_name} {column_type};")
@@ -176,7 +244,7 @@ class DiscordBase:
                 logger.debug(f"Column '{column_name}' already  exists in table '{table_name}'.")
         
         except sqlite3.OperationalError as e:
-            print(f"Unexpected error: {e}")
+            logger.error(f"Unexpected error: {e}")
 
     def select_Message_Id(self, sender):
         try:
@@ -387,12 +455,12 @@ class DiscordBase:
     def insert_Voter_Registration(self, discord_user, discord_user_id, discord_nick, player_id, register_cnt, not_ingame_cnt, clan_tag=None, t17_number=None, emojis=None, display_format=None):
         try:
             # Try update first
-            self.cursor.execute('UPDATE voter_register SET votreg_dis_user = ?, votreg_dis_nick = ?, votreg_t17_id = ?, votereg_ask_reg_cnt = ?, votereg_not_ingame_cnt = ?, votreg_clan_tag = ?, votreg_t17_number = ?, votreg_emojis = ?, votreg_display_format = ? WHERE votreg_dis_user_id = ?', 
+            self.cursor.execute('UPDATE voter_register SET votreg_dis_user = ?, votreg_dis_nick = ?, votreg_t17_id = ?, votreg_ask_reg_cnt = ?, votereg_not_ingame_cnt = ?, votreg_clan_tag = ?, votreg_t17_number = ?, votreg_emojis = ?, votreg_display_format = ? WHERE votreg_dis_user_id = ?', 
                 (str(discord_user), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format, int(discord_user_id)))
             
             # If no update happened, do insert
             if self.cursor.rowcount == 0:
-                self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votereg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votreg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
                     (str(discord_user), int(discord_user_id), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format))
             
             self.conn.commit()  
@@ -404,7 +472,7 @@ class DiscordBase:
 
     def select_T17_Voter_Registration(self, discord_user_id):
         try:
-            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt FROM voter_register WHERE votreg_dis_user_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (int(discord_user_id),))
+            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_ask_reg_cnt FROM voter_register WHERE votreg_dis_user_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (int(discord_user_id),))
             result = self.cursor.fetchone()
             return result if result else None
 
@@ -417,7 +485,7 @@ class DiscordBase:
 
     def select_T17_Voter_Registration_By_T17ID(self, t17_id):
         try:
-            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt FROM voter_register WHERE votreg_t17_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (str(t17_id),))
+            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_ask_reg_cnt FROM voter_register WHERE votreg_t17_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (str(t17_id),))
             result = self.cursor.fetchone()
             return result if result else None
 
