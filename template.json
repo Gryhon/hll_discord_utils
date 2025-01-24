@@ -73,7 +73,7 @@
                 "vote_channel_id": 0,
                 "reminder": 20,
                 "stealth_vote": false,
-                "remind_registered_users": true,
+                "max_reminders_per_game": 0,
                 "vote_header": "Vote for the nextmap on <your discord>",
                 "map_pool": [{
                     "day": 0,

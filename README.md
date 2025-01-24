@@ -193,8 +193,12 @@ The software is intended to run in a Docker container. I recommend that you run 
 > Otherwise this function will not work as intended!
 
 > [!Important]
+> If you use the audit/log webhook from CRCON in your Discord, this will inevitably lead to reaching Discord's rate limits, causing connection issues for the bot. Please disable the audit/log webhook from CRCON!
+
+> [!Important]
 > Check the access to the discord commands carefully. 
 > Ensure that only the people who are supposed to have access to the Discord commands actually have it! 
+
 #### Discord Setup
 *Written assuming you do not know discord bots and are setting this up for private deployment to your server*
 1. Register yourself at https://discord.com/developers/docs/intro
@@ -344,7 +348,8 @@ Create a seperate CRCON user. All messages send by the Bot will be in the audit 
                 "dectivate_vote": 50,        // minimum amount of playeer to deactivate the map vote function
                 "vote_channel_id": 0,        // discord channel id where the vote should happens
                 "reminder": 20,              // time in minutes to remind the player to vote 
-                "stealth_vote": false,        // if true a message will only be sent to discord and not in game
+                "stealth_vote": false,       // if true a message will only be sent to discord and not in game
+                "max_reminders_per_game": 0, // You can limit the number of reminders shown in game. Set to 0 for unlimited.
                 "vote_header": "Vote for the nextmap on <your discord>", // add here your header for the vote window ingame
                 "default_map_filter":[{      // map names and enviroment can be found here https://gist.github.com/timraay/5634d85eab552b5dfafb9fd61273dc52
                                              // ensure that all items are !! lower case !!  
