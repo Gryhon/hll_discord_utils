@@ -455,12 +455,12 @@ class DiscordBase:
     def insert_Voter_Registration(self, discord_user, discord_user_id, discord_nick, player_id, register_cnt, not_ingame_cnt, clan_tag=None, t17_number=None, emojis=None, display_format=None):
         try:
             # Try update first
-            self.cursor.execute('UPDATE voter_register SET votreg_dis_user = ?, votreg_dis_nick = ?, votreg_t17_id = ?, votreg_ask_reg_cnt = ?, votereg_not_ingame_cnt = ?, votreg_clan_tag = ?, votreg_t17_number = ?, votreg_emojis = ?, votreg_display_format = ? WHERE votreg_dis_user_id = ?', 
+            self.cursor.execute('UPDATE voter_register SET votreg_dis_user = ?, votreg_dis_nick = ?, votreg_t17_id = ?, votreg_ask_reg_cnt = ?, votreg_not_ingame_cnt = ?, votreg_clan_tag = ?, votreg_t17_number = ?, votreg_emojis = ?, votreg_display_format = ? WHERE votreg_dis_user_id = ?', 
                 (str(discord_user), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format, int(discord_user_id)))
             
             # If no update happened, do insert
             if self.cursor.rowcount == 0:
-                self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votreg_ask_reg_cnt, votereg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
+                self.cursor.execute('INSERT INTO voter_register (votreg_dis_user, votreg_dis_user_id, votreg_dis_nick, votreg_t17_id, votreg_ask_reg_cnt, votreg_not_ingame_cnt, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_display_format) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', 
                     (str(discord_user), int(discord_user_id), str(discord_nick), str(player_id), int(register_cnt), int(not_ingame_cnt), clan_tag, t17_number, emojis, display_format))
             
             self.conn.commit()  

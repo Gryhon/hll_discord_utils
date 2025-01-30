@@ -55,9 +55,15 @@ class MainBot(commands.Bot):
         if (config.get("rcon", 0, "comfort_functions", 0, "enabled")):
             logger.info ("Start comfort functions")
             await self.add_cog(Comfort(self))
+
+        if (config.get("rcon", 0, "register_player", 0, "enabled")):
+            logger.info ("Start registration functions")
             await self.add_cog(Registration(self))
-            await self.add_cog(NameChange(self))
+            
+        if (config.get("rcon", 0, "name_change_registration", 0, "enabled")):
+            logger.info ("Start registration functions")
             await self.add_cog(Unregister(self))
+            await self.add_cog(NameChange(self))
             await self.add_cog(UpdateName(self))
             await self.add_cog(NameEmoji(self))
             

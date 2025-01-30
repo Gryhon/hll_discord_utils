@@ -131,3 +131,17 @@ class Jmes_Path ():
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return not_match
+
+
+def is_Integer(string: str, natural_number = True) -> bool:
+    try:
+        number = int(string)
+
+        if natural_number and number > 0:
+            return True
+        elif not natural_number:
+            return True
+        else:
+            return False
+    except ValueError:
+        return False

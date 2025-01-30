@@ -7,7 +7,8 @@
             "bearer_token": "",
             "discord_token": "",
             "log_level": "INFO",
-            "name_change_registration": {
+            
+            "name_change_registration": [{
                 "enabled": true,
                 "t17_number": {
                     "required": false,
@@ -37,7 +38,10 @@
                     "enabled": true,
                     "channel_id": "YOUR_CHANNEL_ID_HERE"
                 }
-            },
+            }],
+            "register_player": [{
+                "enabled": true
+            }],
             "comfort_functions": [{
                 "enabled": false,
                 "dryrun": false

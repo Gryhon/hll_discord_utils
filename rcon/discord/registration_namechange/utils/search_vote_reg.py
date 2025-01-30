@@ -45,7 +45,7 @@ async def register_user(db_instance, user_name: str, user_id: int, nick_name: st
             user_id,
             nick_name,
             ingame_name,
-            vote_reminders,  # votereg_ask_reg_cnt - 1 for enabled, 0 for disabled
+            vote_reminders,  # votreg_ask_reg_cnt - 1 for enabled, 0 for disabled
             0,  # not_ingame_cnt
             None,  # clan_tag
             None,  # t17_number
@@ -124,9 +124,9 @@ async def get_registration_details(db_instance, user_id: int) -> Tuple[Optional[
     """Get full registration details for a user.
     Returns (result_tuple, error_message)"""
     try:
-        # Get full registration details including votereg_ask_reg_cnt
+        # Get full registration details including votreg_ask_reg_cnt
         db_instance.cursor.execute(
-            '''SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votereg_ask_reg_cnt 
+            '''SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_ask_reg_cnt 
                FROM voter_register 
                WHERE votreg_dis_user_id = ? 
                ORDER BY votreg_seqno DESC LIMIT 1''', 
@@ -194,7 +194,7 @@ async def update_registration(
             user_id,
             nick_name,
             player_id,
-            1 if vote_reminders else 0,  # votereg_ask_reg_cnt
+            1 if vote_reminders else 0,  # votreg_ask_reg_cnt
             0,  # not_ingame_cnt
             clan_tag,
             t17_number,
