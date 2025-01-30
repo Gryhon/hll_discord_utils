@@ -3,7 +3,6 @@ import logging
 import asyncio
 import random
 import time
-import re
 import rcon.model as model
 import rcon.rcon as rcon
 from typing import List
