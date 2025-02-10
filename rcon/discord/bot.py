@@ -10,6 +10,7 @@ from rcon.discord.balance import Balance
 from rcon.discord.votemap import VoteMap
 from rcon.discord.autolevel import AutoLevel
 from rcon.discord.comfort import Comfort
+from rcon.discord.artillerycalculator import ArtilleryCalculator
 from rcon.discord.registration_namechange import Registration, NameChange, Unregister, UpdateName
 from rcon.discord.registration_namechange.name_emoji import NameEmoji
 
@@ -29,7 +30,7 @@ class MainBot(commands.Bot):
 
         while not self.shutdown_event.is_set():
             await asyncio.sleep (5)
-
+    
     async def setup_hook(self):
         
         if (config.get("rcon", 0, "server_status", 0, "enabled")):
@@ -60,16 +61,20 @@ class MainBot(commands.Bot):
             await self.add_cog(Unregister(self))
             await self.add_cog(UpdateName(self))
             await self.add_cog(NameEmoji(self))
+
+        if (config.get("rcon", 0, "artillery_calculator", 0, "enabled")):
+            logger.info ("Start auto artillery calculator")
+            await self.add_cog(ArtilleryCalculator(self))             
             
         await self.tree.sync()
         logger.info ("Slash commands have been synced.")
-        
+       
 
     def run_bot(self):
         self.tree.clear_commands (guild=discord.Object(id=1299285373855203349))
         logger.info ("Slash commands have been synced.")
-
         token = config.get("rcon", 0, "discord_token")
+
         self.run(token)
 
     def shutdown_bot(self):
