@@ -257,6 +257,14 @@ class InGamePlayers ():
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None
+        
+    def is_Player_Ingame (self, player_id):
+        result = self.get_Ingame_Player_Level (player_id)
+
+        if result == None:
+            return False
+        else:
+            return True 
 
     def is_Ingame_Player_VIP (self, player_id):
         try:

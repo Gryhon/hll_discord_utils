@@ -6,6 +6,7 @@ __pycache__/
 *.pyc
 *.log
 *.log.*
+*.json.*
 
 # MacOS
 .DS_Store

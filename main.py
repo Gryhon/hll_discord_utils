@@ -4,10 +4,14 @@ import signal
 import sys
 import threading
 from lib.config import config
+from lib.configupdater import ConfigUpdater
 from lib.logging import setup_logger
 from rcon.discord.bot import start_bot, shutdown_bot
 
-config.load_config ()
+config_name = "config.json"
+template_name = "template.json"
+
+config.load_Config (config_name)
 
 class GracefulKiller:
     kill_now = False
@@ -18,10 +22,22 @@ class GracefulKiller:
     def exit_gracefully(self, *args):
         self.kill_now = True
 
-async def main():
-    setup_logger(config.get("rcon", 0, "log_level"))
+async def update_Config ():
 
+    config_updater = ConfigUpdater(template_name, config_name)
+    config_updater.update()
+
+    if config_updater.updated_config:
+        config_updater.save_Config(config_name)
+        config.load_Config (config_name, True)
+
+async def main():
+    
+    setup_logger(config.get("rcon", 0, "log_level"))
+    
     logger = logging.getLogger(__name__)
+
+    await update_Config ()
 
     killer = GracefulKiller()
     logger.info("Program started. Press Ctrl+C to exit the program.")

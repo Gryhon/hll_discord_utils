@@ -8,39 +8,9 @@
             "discord_token": "",
             "log_level": "INFO",
             
-            "name_change_registration": [{
-                "enabled": true,
-                "t17_number": {
-                    "required": false,
-                    "show": true
-                },
-                "clan_tag": {
-                    "show": true,
-                    "position": "prefix",
-                    "blocked_tags": ["ABC", "XYZ", "TEST"],
-                    "max_length": 4
-                },
-                "emojis": {
-                    "show": true,
-                    "max_count": 3
-                },
-                "roles": {
-                    "registered": {
-                        "enabled": true,
-                        "role_id": "YOUR_ROLE_ID_HERE"
-                    },
-                    "name_changed": {
-                        "enabled": true,
-                        "role_id": "YOUR_ROLE_ID_HERE"
-                    }
-                },
-                "notifications": {
-                    "enabled": true,
-                    "channel_id": "YOUR_CHANNEL_ID_HERE"
-                }
-            }],
             "register_player": [{
-                "enabled": true
+                "enabled": true,
+                "verify_ingame": false
             }],
             "comfort_functions": [{
                 "enabled": false,
@@ -53,6 +23,11 @@
             "server_status": [{
                 "enabled": false,
                 "webhook": ""
+            }],
+            "artillery_calculator": [{
+                "enabled": false,
+                "interval": 100, 
+                "in_game_messages": true
             }],
             "server_balance": [{
                 "enabled": false,
@@ -90,7 +65,7 @@
                     "blacklist_maps": [],
                     "exclude_played_maps": 0
                 }]
-            }]
+            }]            
         }
     ]
 }

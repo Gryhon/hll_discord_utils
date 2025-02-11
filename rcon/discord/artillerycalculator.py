@@ -162,13 +162,17 @@ class ArtilleryCalculator (commands.Cog, DiscordBase):
                         if config.get("rcon", 0, "artillery_calculator", 0, "in_game_messages", default=False):
                             
                             player_id, _, _, _, _ = self.select_T17_Voter_Registration (interaction.user.id)
+                            ingame = await rcon.get_In_Game_Players ()                       
                             
-                            if player_id is not None:
+                            if ingame.is_Player_Ingame (player_id) == True:
                                 table = await self.calculate_Intervall (distance, fraction.value, config.get("rcon", 0, "artillery_calculator", 0, "interval", default=100))
 
                                 if table is not None:
+                                    logger.info(f"Send message to player {player_id} with table for distance: {distance}m / {mil_value} MILs.")
                                     data = {"player_id": str(player_id), "message": table}
                                     await rcon.send_Player_Message(data)
+                            else:
+                                logger.debug(f"Player {player_id} is not ingame. No mail sent.")
 
                         await private_thread.send(f"Calculated Mil at {distance} meters: {mil_value} Mil.")
                     else:
