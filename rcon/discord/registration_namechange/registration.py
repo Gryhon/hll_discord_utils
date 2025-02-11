@@ -100,7 +100,7 @@ class Registration(commands.Cog, DiscordBase):
                 else:
                     if config.get("rcon", 0, "register_player", 0, "verify_ingame") == True:
                         number = random.randint(1, 99)
-                        data = {"player_id": str (ingame_name) , "message": f"Enter this number in Discord to verify your accont:\n\n{str (number)}" }   
+                        data = {"player_id": str (ingame_name) , "message": f"Enter this number in Discord to\n verify your accont:\n\n{str (number)}" }   
 
                         logger.info (f"Send verification message to player: {ingame_name} with number: {number}")  
                         await rcon.send_Player_Message (data)

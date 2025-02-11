@@ -11,9 +11,9 @@ class config:
     _config_data: Dict[str, Any] = {}
 
     @classmethod
-    def load_config(cls, filename: str = "config.json"):
+    def load_Config(cls, filename: str = "config.json", reload: bool = False):
         # Load configuration from JSON file.
-        if not cls._config_data:
+        if reload or not cls._config_data:
             with open(filename, 'r') as file:
                 cls._config_data = json.load(file)
 
