@@ -598,9 +598,6 @@ class VoteMap(commands.Cog, DiscordBase):
                     await self.start_Vote ()
                     await self.set_Vote_Result ()
 
-                    if not config.get("rcon", 0, "map_vote", 0, "stealth_vote"):
-                        await self.send_Vote_Message ()
-
                     self.last_execution = time.time()
                     self.reminder_count = 0
 
