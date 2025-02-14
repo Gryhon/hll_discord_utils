@@ -102,10 +102,13 @@ class Maps():
             for item in map_ids:
                 map = Map ()
                 map.id = item
-                map.pretty_name = J_Path.get_Match (f"$.result[?(@.id == '{item}')].pretty_name", self.json, "End of Game")
+                map.pretty_name = J_Path.get_Match (f"$.result[?(@.id == '{item}')].pretty_name", self.json, "End of Game 1")
                 map.environment = J_Path.get_Match (f"$.result[?(@.id == '{item}')].environment", self.json)
                 map.image_name = J_Path.get_Match (f"$.result[?(@.id == '{item}')].image_name", self.json)
                 self.maps.append (map)
+
+                if map.pretty_name == "End of Game 1":
+                    logger.error(f"Map with id {item} not found")
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -115,7 +118,7 @@ class Maps():
         try:
             for item in map_pretty_names:
                 map = Map ()
-                map.id = J_Path.get_Match (f"$.result[?(@.pretty_name == '{item}')].id", self.json, "End of Game")
+                map.id = J_Path.get_Match (f"$.result[?(@.pretty_name == '{item}')].id", self.json, "End of Game 2")
                 map.pretty_name = item
                 map.environment = J_Path.get_Match (f"$.result[?(@.pretty_name == '{item}')].environment", self.json)
                 map.image_name = J_Path.get_Match (f"$.result[?(@.pretty_name == '{item}')].image_name", self.json)
@@ -128,7 +131,7 @@ class Maps():
 class CurrentMap(Map):
     def parse_Json (self, json_string):
         try:
-            self.pretty_name = J_Path.get_Match ("$..current_map..pretty_name", json_string, "End of Game")
+            self.pretty_name = J_Path.get_Match ("$..current_map..pretty_name", json_string, "End of Game 3")
             self.game_mode = J_Path.get_Match ("$..current_map..game_mode", json_string)
             self.environment = J_Path.get_Match ("$..current_map..environment", json_string)
             self.attackers = J_Path.get_Match ("$..current_map..attackers", json_string)

@@ -9,7 +9,7 @@
             "log_level": "INFO",
             
             "register_player": [{
-                "enabled": true,
+                "enabled": false,
                 "verify_ingame": false
             }],
             "comfort_functions": [{
