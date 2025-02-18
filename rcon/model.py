@@ -1,4 +1,5 @@
 import logging
+import random
 from datetime import datetime
 from lib.utils import J_Path, Jmes_Path
 
@@ -77,12 +78,19 @@ class Maps():
             logger.error(f"Unexpected error: {e}")
             return None
         
-    def get_Map_Names (self, enviroment = [], game_mode = [], blacklist = []):
+    def get_Map_Names (self, enviroment = [], game_mode = [], blacklist = [], duplicate_maps = True):
         try:
             matches = self.get_Maps (enviroment, game_mode)
-
+            
             if matches: 
                 names = J_Path.get_Matches ("$[*].id", matches)
+
+                # Remove duplicate maps based on the map id to avoid the same map 
+                # in the map rotation only with different environment   
+                if duplicate_maps == False:
+                    names = random.sample(names, len (names))
+                    names = self.remove_Duplcate_Maps (names)
+
 
                 if len (names):
                     filtered_list = list(set(names) - set(blacklist))
@@ -93,6 +101,50 @@ class Maps():
                 logger.error(f"No Json data")    
                 return None
 
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    # Remove duplicate maps based on the map id
+    def remove_Duplcate_Maps (self, list = []):
+        try:
+            result = []
+            temp = []
+
+            for item in list:
+                map_id = J_Path.get_Matches (f"$.result[?(@.id == '{item}')].map.id", self.json)[0]
+
+                if map_id not in temp:
+                    temp.append (map_id)
+                    result.append (item)
+           
+            if len (result):
+                return result
+            else:
+                return None
+            
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+    def change_Maps_Enviroment (self, list = [], environment = "night"):
+        try:
+            result = []
+
+            for item in list:
+                map_id = J_Path.get_Match (f"$.result[?(@.id == '{item}')].map.id", self.json)
+                map_mode = J_Path.get_Match (f"$.result[?(@.id == '{item}')].game_mode", self.json)
+                night_map_id = Jmes_Path.get_Match (f"result[?(@.map.id == '{map_id}' && @.game_mode == '{map_mode}' && @.environment == '{environment}')].id", self.json, None)
+
+                if night_map_id != None:
+                    result.extend (night_map_id)
+                    logger.debug (f"Map ID: {map_id} - Map Mode: {map_mode} - Night Map ID: {night_map_id}")
+
+            if len (result):
+                return result
+            else:
+                return None
+            
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None
