@@ -81,6 +81,8 @@ class Comfort (commands.Cog, DiscordBase):
     @app_commands.choices(action=[
         app_commands.Choice(name="Balance", value="balance"),
         app_commands.Choice(name="The server will be closed after this game", value="shutdown"),
+        app_commands.Choice(name="Only fight over the 3rd objective while seeding", value="seeding1"),
+        app_commands.Choice(name="No garrisons beyond zones E and F may be destroyed", value="seeding2"),
         app_commands.Choice(name="Free text", value="text"),
     ])
     async def broadcast_message(self, interaction: discord.Interaction, fraction: app_commands.Choice[str], action: app_commands.Choice[str], free_text: str = None):
@@ -94,6 +96,13 @@ class Comfort (commands.Cog, DiscordBase):
 
         elif action_value == "shutdown":
             message = "Server will be shutdown after this game. \nThank you for your understanding. \n\nWe look forward to seeing you again!"
+
+        elif action_value == "seeding1":
+            message = "Only fight over the 3rd objective while seeding!"
+
+        elif action_value == "seeding2":
+            message = "No garrisons beyond zones E and F may be destroyed!"
+            
 
         elif action_value == "text":
             if not free_text:

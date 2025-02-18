@@ -376,29 +376,35 @@ class VoteMap(commands.Cog, DiscordBase):
         
     async def get_Maps_To_Vote (self):
         try:
+            duplicate_maps = config.get("rcon", 0, "map_vote", 0, "duplicate_maps")
             result = []
             last_maps = []
             blacklist = []
 
             modes = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "battle_mode")
             blacklist = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "blacklist_maps")
+            logger.info (f"Blacklist: {blacklist}")
 
             last_maps = await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "exclude_played_maps"))
 
             if last_maps is not None:
                 blacklist.extend (last_maps)
-
-            logger.info (f"Blacklist: {blacklist}")
+                logger.info (f"Updated (last_played) blacklist: {blacklist}")
 
             all_maps = await rcon.get_Maps ()
 
             day_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "day")
 
             if day_cnt > 0:
-                list = all_maps.get_Map_Names (["day"], modes, blacklist)
+                list = all_maps.get_Map_Names (["day", "dusk", "overcast"], modes, blacklist, duplicate_maps)
+
                 list = await self.get_Random_Items (list, day_cnt)
                 result.extend (list)
                 logger.info (f"{day_cnt} random day maps: {list}")
+
+                if duplicate_maps == False:
+                    blacklist.extend (all_maps.change_Maps_Enviroment (list, "night"))
+                    logger.info (f"Updated (duplicate_maps) blacklist: {blacklist}")
 
             night_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "night")
 

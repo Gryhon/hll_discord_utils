@@ -54,6 +54,7 @@
                 "stealth_vote": false,
                 "max_reminders_per_game": 0,
                 "vote_header": "Vote for the nextmap on <your discord>",
+                "duplicate_maps": true,
                 "map_pool": [{
                     "day": 0,
                     "night": 0,
