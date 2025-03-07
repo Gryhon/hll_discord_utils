@@ -472,29 +472,39 @@ class DiscordBase:
 
     def select_T17_Voter_Registration(self, discord_user_id):
         try:
-            self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_ask_reg_cnt FROM voter_register WHERE votreg_dis_user_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (int(discord_user_id),))
+            self.cursor.execute(
+                '''SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, 
+                          votreg_emojis, votreg_ask_reg_cnt 
+                   FROM voter_register 
+                   WHERE votreg_dis_user_id = ? 
+                   ORDER BY votreg_seqno DESC 
+                   LIMIT 1''',
+                (int(discord_user_id),)
+            )
             result = self.cursor.fetchone()
-            return result if result else None
+
+            return result if result else [None] * 5
 
         except sqlite3.OperationalError as e:
             logger.error(f"SQLite OperationalError: {e}")
-            return None
+            return [None] * 5
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-            return None
+            return [None] * 5
 
     def select_T17_Voter_Registration_By_T17ID(self, t17_id):
         try:
             self.cursor.execute('SELECT votreg_t17_id, votreg_clan_tag, votreg_t17_number, votreg_emojis, votreg_ask_reg_cnt FROM voter_register WHERE votreg_t17_id = ? ORDER BY votreg_seqno DESC LIMIT 1', (str(t17_id),))
             result = self.cursor.fetchone()
-            return result if result else None
+
+            return result if result else [None] * 5
 
         except sqlite3.OperationalError as e:
             logger.error(f"SQLite OperationalError: {e}")
-            return None
+            return [None] * 5
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-            return None
+            return [None] * 5
 
     def select_T17_Voter (self, start_map):
         try:
