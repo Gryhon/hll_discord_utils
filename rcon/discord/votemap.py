@@ -34,7 +34,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.pause_message = ("\n\n"
                             "       Vote function is paused!\n\n"
                             "   We will inform you in the channel\n"
-                            "  when the function is anabled again.\n\n"
+                            "  when the function is enabled again.\n\n"
                             "             Stay tuned!\n\n")
         self.vote_channel_id = config.get("rcon", 0, "map_vote", 0, "vote_channel_id") 
         self.vote_channel = None   
