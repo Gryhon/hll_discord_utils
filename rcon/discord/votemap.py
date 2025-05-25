@@ -531,7 +531,9 @@ class VoteMap(commands.Cog, DiscordBase):
 
                 if registration != None:
                     _, _, _, _, ask_reg_cnt = registration
-                    wants_reminders = bool(ask_reg_cnt)
+
+                    if ask_reg_cnt != None:
+                        wants_reminders = bool(ask_reg_cnt)
 
                 if (voters is None or player.player_id not in voters) and not (reminder and not wants_reminders):
                     data = None
