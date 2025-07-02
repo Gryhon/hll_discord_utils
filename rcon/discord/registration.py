@@ -11,8 +11,6 @@ from discord import app_commands
 from discord.ext import commands
 from rcon.discord.discordbase import DiscordBase
 from lib.config import config
-from .utils.role_utils import handle_roles
-from .utils.message_utils import send_success_embed
 
 # get Logger for this module
 logger = logging.getLogger(__name__)
@@ -22,10 +20,11 @@ class Verify_Account(discord.ui.Modal, title="Verify your account"):
         super().__init__()
         self.expected_number = expected_number
         self.number = discord.ui.TextInput(label="In-game displayed number:", placeholder="Number only", required=True)
-        self.add_item(self.number)
+        self.add_item(self.number)  
 
     async def on_submit(self, interaction: discord.Interaction):
         try:
+            logger.info(f"Modal submitted with number: {self.number.value}")
             if is_Integer (self.number.value) == True:
                 user_input = int(self.number.value) 
 
@@ -85,7 +84,7 @@ class Registration(commands.Cog, DiscordBase):
             user_id = interaction.user.id 
             nick_name = interaction.guild.get_member(user_id).nick
 
-            player_id = self.select_T17_Voter_Registration (user_id)
+            player_id,_,_,_,_ = self.select_T17_Voter_Registration (user_id)
 
             # Use default True if no choice made
             vote_reminder_value = vote_reminders.value if vote_reminders else 1
@@ -118,28 +117,9 @@ class Registration(commands.Cog, DiscordBase):
 
                     if register:
                         self.insert_Voter_Registration (user_name, user_id, nick_name, ingame_name, vote_reminder_value, 0)
+                        logger.info(f"User {user_name} (ID: {user_id}) registered with in-game T17 ID {ingame_name} and vote reminders set to {bool (vote_reminder_value)}")
 
-                    # use the enhanced version of register_user
-                    # ToDo: needs to be tested
-                    # ToDo: needs to check verify_ingame parameter. otherwise -> Unexpected error: This interaction has already been responded to before
-                    if config.get("rcon", 0, "name_change_registration", "enabled"):
-                        role_error = await handle_roles(member, 'registered')
-                        
-                        if role_error:
-                            message += f"\nNote: {role_error}"
-
-                        member = interaction.guild.get_member(interaction.user.id)
-                
-                        # Send success embed
-                        await send_success_embed(interaction.guild, 
-                                                 interaction.user, 
-                                                 'registered', 
-                                                 member.nick or interaction.user.name,
-                                                 ingame_name)
-            
-                        await interaction.response.send_message(message, ephemeral=True)
-
-                    elif not config.get("rcon", 0, "register_player", 0, "verify_ingame"):
+                    if config.get("rcon", 0, "register_player", 0, "verify_ingame") == False:
                         await interaction.response.send_message("You are now registered", ephemeral=True)
 
             else:

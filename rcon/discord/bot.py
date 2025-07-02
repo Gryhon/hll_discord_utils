@@ -11,8 +11,9 @@ from rcon.discord.votemap import VoteMap
 from rcon.discord.autolevel import AutoLevel
 from rcon.discord.comfort import Comfort
 from rcon.discord.artillerycalculator import ArtilleryCalculator
-from rcon.discord.registration_namechange import Registration, NameChange, Unregister, UpdateName
-from rcon.discord.registration_namechange.name_emoji import NameEmoji
+from rcon.discord.registration import Registration
+from rcon.discord.unregister import Unregister
+
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -59,14 +60,9 @@ class MainBot(commands.Bot):
 
         if (config.get("rcon", 0, "register_player", 0, "enabled")):
             logger.info ("Start registration functions")
-            await self.add_cog(Registration(self))
             
-        if (config.get("rcon", 0, "name_change_registration", 0, "enabled")):
-            logger.info ("Start registration functions")
+            await self.add_cog(Registration(self))
             await self.add_cog(Unregister(self))
-            await self.add_cog(NameChange(self))
-            await self.add_cog(UpdateName(self))
-            await self.add_cog(NameEmoji(self))
 
         if (config.get("rcon", 0, "artillery_calculator", 0, "enabled")):
             logger.info ("Start auto artillery calculator")
