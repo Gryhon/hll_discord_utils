@@ -87,8 +87,8 @@ class Maps():
 
                 # Remove duplicate maps based on the map id to avoid the same map 
                 # in the map rotation only with different environment   
-                if duplicate_maps == False:
-                    names = random.sample(names, len (names))
+                if duplicate_maps == False and len (names) >= 1:
+                    names = random.sample(names, min(1, len (names)))
                     names = self.remove_Duplcate_Maps (names)
 
 
@@ -106,12 +106,12 @@ class Maps():
             return None
 
     # Remove duplicate maps based on the map id
-    def remove_Duplcate_Maps (self, list = []):
+    def remove_Duplcate_Maps (self, pool = []):
         try:
             result = []
             temp = []
 
-            for item in list:
+            for item in pool:
                 map_id = J_Path.get_Matches (f"$.result[?(@.id == '{item}')].map.id", self.json)[0]
 
                 if map_id not in temp:
@@ -127,11 +127,11 @@ class Maps():
             logger.error(f"Unexpected error: {e}")
             return None
         
-    def change_Maps_Enviroment (self, list = [], environment = "night"):
+    def change_Maps_Enviroment (self, pool = [], environment = "night"):
         try:
             result = []
 
-            for item in list:
+            for item in pool:
                 map_id = J_Path.get_Match (f"$.result[?(@.id == '{item}')].map.id", self.json)
                 map_mode = J_Path.get_Match (f"$.result[?(@.id == '{item}')].game_mode", self.json)
                 night_map_id = Jmes_Path.get_Match (f"result[?(@.map.id == '{map_id}' && @.game_mode == '{map_mode}' && @.environment == '{environment}')].id", self.json, None)

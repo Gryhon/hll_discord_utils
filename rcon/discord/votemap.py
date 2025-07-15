@@ -355,20 +355,20 @@ class VoteMap(commands.Cog, DiscordBase):
         
     async def enforce_Match (self, liste1, liste2, match_count):
         try:
-            list = []
+            enforce_list = []
 
             matches = set(liste1) & set(liste2)
 
             if len(matches) < match_count:
-                list = await self.get_Random_Items(liste1, len (liste1) - match_count)
+                enforce_list = await self.get_Random_Items(liste1, len (liste1) - match_count)
                 enforced = await self.get_Random_Items(liste2, match_count)
                 logger.info (f"No match! Injection is enforced!")
 
-                list.extend (enforced)
+                enforce_list.extend (enforced)
             else:
-                list = liste1
+                enforce_list = liste1
            
-            return list
+            return enforce_list
         
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -385,34 +385,35 @@ class VoteMap(commands.Cog, DiscordBase):
             blacklist = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "blacklist_maps")
             logger.info (f"Blacklist: {blacklist}")
 
-            last_maps = await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "exclude_played_maps"))
+            last_maps = list(set(await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "exclude_played_maps"))))
+            logger.info(f"Updated last_maps list (used to exclude maps): {last_maps}")
 
             if last_maps is not None:
                 blacklist.extend (last_maps)
-                logger.info (f"Updated (last_played) blacklist: {blacklist}")
+                logger.info (f"Updated blacklist: {blacklist} (added last played maps)")
 
             all_maps = await rcon.get_Maps ()
 
             day_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "day")
 
             if day_cnt > 0:
-                list = all_maps.get_Map_Names (["day", "dusk", "overcast"], modes, blacklist, duplicate_maps)
+                day_list = all_maps.get_Map_Names (["day", "dusk", "overcast"], modes, blacklist, duplicate_maps)
 
-                list = await self.get_Random_Items (list, day_cnt)
-                result.extend (list)
-                logger.info (f"{day_cnt} random day maps: {list}")
+                day_list = await self.get_Random_Items (day_list, day_cnt)
+                result.extend (day_list)
+                logger.info (f"{day_cnt} random day maps: {day_list}")
 
                 if duplicate_maps == False:
-                    blacklist.extend (all_maps.change_Maps_Enviroment (list, "night"))
+                    blacklist.extend (all_maps.change_Maps_Enviroment (day_list, "night"))
                     logger.info (f"Updated (duplicate_maps) blacklist: {blacklist}")
 
             night_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "night")
 
             if night_cnt > 0:
-                list = all_maps.get_Map_Names (["night"], modes, blacklist)
-                list = await self.get_Random_Items (list, night_cnt)
-                result.extend (list)
-                logger.info (f"{night_cnt} random night maps: {list}")
+                night_list = all_maps.get_Map_Names (["night"], modes, blacklist)
+                night_list = await self.get_Random_Items (night_list, night_cnt)
+                result.extend (night_list)
+                logger.info (f"{night_cnt} random night maps: {night_list}")
 
             enforced_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "enforce")
             enforced_list = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "enforced_maps")
@@ -424,11 +425,11 @@ class VoteMap(commands.Cog, DiscordBase):
 
             if wildcard_cnt > 0:
                 wildcard_mode = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "wildcard_mode")
-                list = all_maps.get_Map_Names (["night", "day"], wildcard_mode, blacklist)
+                wildcard_list = all_maps.get_Map_Names (["night", "day"], wildcard_mode, blacklist)
 
-                list = await self.get_Random_Items (list, wildcard_cnt)
-                result.extend (list)
-                logger.info (f"{wildcard_cnt} random wildcard maps: {list}")
+                wildcard_list = await self.get_Random_Items (wildcard_list, wildcard_cnt)
+                result.extend (wildcard_list)
+                logger.info (f"{wildcard_cnt} random wildcard maps: {wildcard_list}")
 
             random.shuffle(result)
             logger.info (f"Map proposal: {result}")

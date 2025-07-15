@@ -224,9 +224,9 @@ async def get_Map_History (cnt):
         maps = model.MapHistory()
         
         maps.add_Json(data)
-        list = maps.get_Last_Maps (cnt)
+        pool = maps.get_Last_Maps (cnt)
         
-        return list
+        return pool
     else:
         return None 
 

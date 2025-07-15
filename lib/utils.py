@@ -105,15 +105,15 @@ class J_Path ():
             logger.error ("Exception while parsing path: " + path + "in json: " + json_string)
 
     def get_Matches (path, json_string):
-        list = []
+        pool = []
 
         try:
             match = jpath.parse (path).find (json_string)
 
             for m in match:
-                list.append (m.value)
+                pool.append (m.value)
 
-            return list
+            return pool
         except:
             logger.error ("Exception while parsing path: " + path + "in json: " + json_string)
 
