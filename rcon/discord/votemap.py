@@ -360,7 +360,7 @@ class VoteMap(commands.Cog, DiscordBase):
             matches = set(liste1) & set(liste2)
 
             if len(matches) < match_count:
-                enforce_list = await self.get_Random_Items(liste1, len (liste1) - match_count)
+                enforce_list = await self.get_Random_Items(liste1, max (len (liste1), len (liste1) - match_count))
                 enforced = await self.get_Random_Items(liste2, match_count)
                 logger.info (f"No match! Injection is enforced!")
 
