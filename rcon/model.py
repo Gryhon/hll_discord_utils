@@ -88,7 +88,7 @@ class Maps():
                 # Remove duplicate maps based on the map id to avoid the same map 
                 # in the map rotation only with different environment   
                 if duplicate_maps == False and len (names) >= 1:
-                    names = random.sample(names, min(1, len (names)))
+                    names = random.sample(names, max(1, len (names)))
                     names = self.remove_Duplcate_Maps (names)
 
 
