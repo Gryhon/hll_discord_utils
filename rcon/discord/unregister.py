@@ -52,8 +52,7 @@ class Unregister(commands.Cog, DiscordBase):
 
     @app_commands.command(name="unregister_user", description="Remove a user's T17 registration (Admin only)")
     @app_commands.describe(user="The Discord user to unregister")
-    #@app_commands.checks.has_permissions(administrator=True)
-    @app_commands.checks.has_role ("User")
+    @app_commands.checks.has_permissions(administrator=True)
     async def unregister_user (self, interaction: discord.Interaction, user: discord.Member):
         try:
             # Check if user is registered
