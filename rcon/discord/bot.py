@@ -9,10 +9,11 @@ from rcon.discord.maprotation import MapRotation
 from rcon.discord.balance import Balance
 from rcon.discord.votemap import VoteMap
 from rcon.discord.autolevel import AutoLevel
-from rcon.discord.comfort import Comfort
+from rcon.discord.comfort import BroadcastMessage, AfterGameMessage, AutoUnban
 from rcon.discord.artillerycalculator import ArtilleryCalculator
 from rcon.discord.registration import Registration
 from rcon.discord.unregister import Unregister
+from rcon.discord.commands import PunishMe, SwitchMe, WhoKilledMe, WhomIKilled, RemovePlayerFromSquad
 
 
 # get Logger for this modul
@@ -33,7 +34,7 @@ class MainBot(commands.Bot):
             await asyncio.sleep (5)
     
     async def setup_hook(self):
-        
+
         if (config.get("rcon", 0, "server_status", 0, "enabled")):
             logger.info ("Start server status")
             await self.add_cog(ServerStatus(self)) 
@@ -56,7 +57,15 @@ class MainBot(commands.Bot):
 
         if (config.get("rcon", 0, "comfort_functions", 0, "enabled")):
             logger.info ("Start comfort functions")
-            await self.add_cog(Comfort(self))
+
+            if (config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "enabled")):
+                await self.add_cog(AfterGameMessage(self))
+
+            if (config.get("rcon", 0, "comfort_functions", 0, "broadcast_message", 0, "enabled")):
+                await self.add_cog(BroadcastMessage(self))
+
+            if (config.get("rcon", 0, "comfort_functions", 0, "auto_unban", 0, "enabled")):
+                await self.add_cog(AutoUnban(self))
 
         if (config.get("rcon", 0, "register_player", 0, "enabled")):
             logger.info ("Start registration functions")
@@ -66,12 +75,29 @@ class MainBot(commands.Bot):
 
         if (config.get("rcon", 0, "artillery_calculator", 0, "enabled")):
             logger.info ("Start auto artillery calculator")
-            await self.add_cog(ArtilleryCalculator(self))             
+            await self.add_cog(ArtilleryCalculator(self))  
+
+        if (config.get("rcon", 0, "discord_commands", 0, "enabled")):
+            logger.info ("Start registration functions")
+            
+            if (config.get("rcon", 0, "discord_commands", 0, "punish_me", 0, "enabled")):
+                await self.add_cog(PunishMe(self))
+
+            if (config.get("rcon", 0, "discord_commands", 0, "switch_me", 0, "enabled")):
+                await self.add_cog(SwitchMe(self))
+
+            if (config.get("rcon", 0, "discord_commands", 0, "who_killed_me", 0, "enabled")):      
+                await self.add_cog(WhoKilledMe(self))
+
+            if (config.get("rcon", 0, "discord_commands", 0, "whom_i_killed", 0, "enabled")):      
+                await self.add_cog(WhomIKilled(self))
+
+            if (config.get("rcon", 0, "discord_commands", 0, "remove_player_from_squad", 0, "enabled")):      
+                await self.add_cog(RemovePlayerFromSquad(self))
             
         await self.tree.sync()
         logger.info ("Slash commands have been synced.")
        
-
     def run_bot(self):
         self.tree.clear_commands (guild=discord.Object(id=1299285373855203349))
         logger.info ("Slash commands have been synced.")
