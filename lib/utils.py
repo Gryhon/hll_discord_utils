@@ -16,7 +16,7 @@ async def get_Data_from_Url(url, token, payload=None):
     
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as response:
+            async with session.get(url, headers=headers, params=payload) as response:
                 # Check whether the request was successful
                 if response.status == 200:
                     return await response.json()
@@ -29,7 +29,7 @@ async def get_Data_from_Url(url, token, payload=None):
         logger.error(f"Connection error: {error}")
         return None
     
-async def post_data_to_Url(url, token, data):
+async def post_data_to_Url(url, token, payload):
     headers = {
         'Authorization': f'Bearer {token}',
         "Connection": "keep-alive",
@@ -38,7 +38,7 @@ async def post_data_to_Url(url, token, data):
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=json.dumps(data), headers=headers) as response:
+            async with session.post(url, data=json.dumps(payload), headers=headers) as response:
                 # Check whether the request was successful
                 if response.status == 200:
                     return await response.json()
@@ -51,7 +51,7 @@ async def post_data_to_Url(url, token, data):
         logger.error(f"Connection error: {error}")
         return None
 
-async def get_Data (api_url):
+async def get_Data (api_url, payload=None):
      # Read URL and token from environment variables
     base_url = config.get("rcon", 0, "api_url")
     bearer_token = config.get("rcon", 0, "bearer_token")
@@ -66,7 +66,7 @@ async def get_Data (api_url):
 
     # Retrieve API data
     full_url = base_url + api_url
-    data = await get_Data_from_Url(full_url, bearer_token)
+    data = await get_Data_from_Url(full_url, bearer_token, payload)
 
     return data
 
