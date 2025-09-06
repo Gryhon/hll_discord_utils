@@ -2,7 +2,6 @@ import logging
 import json
 import copy
 from typing import Any, Dict, Union
-from configparser import ConfigParser
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -38,6 +37,24 @@ class config:
                 return default
         return copy.deepcopy(value)
     
+    @classmethod
+    def get_node(cls, *keys: Union[str, int], default: Any = None) -> Any:
+        # Retrieve a whole subtree (dict or list) from the configuration.
+        
+        if not cls._config_data:
+            raise ValueError("Configuration has not been loaded. Call 'load_Config()' first.")
+
+        value = cls._config_data
+        for key in keys:
+            if isinstance(value, dict) and key in value:
+                value = value[key]
+            elif isinstance(value, list) and isinstance(key, int) and key < len(value):
+                value = value[key]
+            else:
+                return default
+        
+        return copy.deepcopy(value)
+
     @classmethod
     def set(cls, *keys_and_value: Union[str, int, Any]) -> None:
         """
