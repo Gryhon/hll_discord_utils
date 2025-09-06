@@ -15,7 +15,6 @@ from rcon.discord.registration import Registration
 from rcon.discord.unregister import Unregister
 from rcon.discord.commands import PunishMe, SwitchMe, WhoKilledMe, WhomIKilled, RemovePlayerFromSquad
 
-
 # get Logger for this modul
 logger = logging.getLogger(__name__)
 
