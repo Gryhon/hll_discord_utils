@@ -5,6 +5,21 @@ rm -r venv
 # Name of the virtual environment
 VENV_NAME="venv"
 
+if [ -f .python-version ]; then
+    PY_VERSION=$(cat .python-version)
+
+    # Prüfe, ob die Version bereits installiert ist
+    if pyenv versions --bare | grep -qx "$PY_VERSION"; then
+        echo "Python $PY_VERSION is already installed."
+    else
+        echo "Installing Python $PY_VERSION..."
+        pyenv install "$PY_VERSION"
+    fi
+else
+    echo "No .python-version file found, skipping pyenv."
+fi
+
+
 # Check if Python3 and venv are installed
 if ! command -v python3 &> /dev/null || ! python3 -m venv --help &> /dev/null; then
     echo "Python3 or the venv module is not installed."
