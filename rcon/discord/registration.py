@@ -72,7 +72,7 @@ class Registration(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
             return None
 
-    @app_commands.command(name="register_user", description="Combine you Discord user with you T17 account")
+    @app_commands.command(name="link_t17_user", description="Combine you Discord user with you T17 account")
     @app_commands.describe(ingame_name="Choose you in game user",)
     @app_commands.choices(vote_reminders=[
         app_commands.Choice(name="Remind me if I haven't voted yet", value=1),

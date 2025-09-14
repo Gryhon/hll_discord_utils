@@ -29,7 +29,7 @@ class Unregister(commands.Cog, DiscordBase):
                     ephemeral=True
                 )
 
-    @app_commands.command(name="unregister_me", description="Remove your T17 registration")
+    @app_commands.command(name="unlink_me", description="Remove your T17 registration")
     async def unregister_me(self, interaction: discord.Interaction):
         try:
             user = interaction.user
@@ -50,7 +50,7 @@ class Unregister(commands.Cog, DiscordBase):
             logger.error(f"Error in unregister_user: {e}")
             await interaction.response.send_message ("An error occurred while trying to unregister the user.", ephemeral=True)
 
-    @app_commands.command(name="unregister_user", description="Remove a user's T17 registration (Admin only)")
+    @app_commands.command(name="unlink_user", description="Remove a user's T17 registration (Admin only)")
     @app_commands.describe(user="The Discord user to unregister")
     @app_commands.checks.has_permissions(administrator=True)
     async def unregister_user (self, interaction: discord.Interaction, user: discord.Member):
