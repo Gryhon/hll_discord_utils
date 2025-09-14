@@ -13,8 +13,50 @@
                 "verify_ingame": false
             }],
             "comfort_functions": [{
+                "enabled": true,
+                "dryrun": false,
+                "broadcast_message": [
+                {
+                    "enabled": false
+                }],
+                "after_game_message": [
+                {
+                    "enabled": false,
+                    "message": "After game message here"
+                }],
+                "auto_unban": [
+                {
+                    "enabled": false,
+                    "VIP": true,
+                    "Clan": false,
+                    "Clans": [""]                           
+                }]
+            }],
+            "discord_commands": [{
                 "enabled": false,
-                "dryrun": false
+                "dryrun": false,
+                "admin_always": false,
+                "groups": [""],
+                "punish_me": [{
+                    "enabled": false,
+                    "groups": [""]
+                }],
+                "switch_me": [{
+                    "enabled": false,
+                    "groups": [""]
+                }],
+                "who_killed_me": [{
+                    "enabled": false,
+                    "groups": [""]
+                }],
+                "whom_i_killed": [{
+                    "enabled": false,
+                    "groups": [""]
+                }],
+                "remove_player_from_squad": [{
+                    "enabled": false,
+                    "groups": [""]
+                }]
             }],
             "map_rotation": [{
                 "enabled": false,
@@ -55,7 +97,14 @@
                 "max_reminders_per_game": 0,
                 "vote_header": "Vote for the nextmap on <your discord>",
                 "duplicate_maps": true,
+                "schedule": [{
+                    "days": ["mon", "tue", "wed", "thu", "fri","sat", "sun"],
+                    "profile": "default",
+                    "on": "14:00",
+                    "off": "00:30"
+                }],
                 "map_pool": [{
+                    "profile": "default",
                     "day": 0,
                     "night": 0,
                     "wildcard": 0,
