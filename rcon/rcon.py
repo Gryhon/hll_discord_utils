@@ -158,14 +158,37 @@ async def get_Balance (limits = [50, 100, 250], weights = [0.25, 0.5, 1, 1.25]):
         logger.error(f"Unexpected error: {e}")
         return await get_Balance_Return (limits)
 
-async def get_Recent_Logs (filter, generic_class):
-    data = await post_Data ("/api/get_recent_logs", filter)
+async def get_Recent_Logs (payload, generic_class = None):
+    data = await post_Data ("/api/get_recent_logs", payload)
 
-    if data:
+    if data and generic_class:
         generic = generic_class()
         generic.parse_Json(data)
 
         return generic
+    
+    elif data and not generic_class:
+        logs = model.RecentLogs()
+        logs.parse_Json(data)
+        
+        return logs
+    else:
+        return None
+    
+async def get_Structured_Logs (payload, generic_class = None):
+    data = await get_Data ("/api/get_structured_logs", payload)
+
+    if data and generic_class:
+        generic = generic_class()
+        generic.parse_Json(data)
+
+        return generic
+    
+    elif data and not generic_class:
+        logs = model.StructuredLogs()
+        logs.parse_Json(data)
+        
+        return logs
     else:
         return None
 
@@ -235,6 +258,12 @@ async def set_Map_Rotation (payload):
 
 async def send_Player_Message (message):
     await post_Data ("/api/message_player", message)
+
+async def Punish_Player (message):
+    await post_Data ("/api/punish", message)
+
+async def Switch_Player_Now (message):
+    await post_Data ("/api/switch_player_now", message)
 
 async def kick_Player (payload):
     await post_Data ("/api/kick", payload)
