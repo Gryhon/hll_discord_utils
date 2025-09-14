@@ -88,7 +88,7 @@ class Maps():
                 # Remove duplicate maps based on the map id to avoid the same map 
                 # in the map rotation only with different environment   
                 if duplicate_maps == False and len (names) >= 1:
-                    names = random.sample(names, min(1, len (names)))
+                    names = random.sample(names, max(1, len (names)))
                     names = self.remove_Duplcate_Maps (names)
 
 
@@ -300,7 +300,7 @@ class InGamePlayers ():
     def get_Ingame_Player_Level (self, player_id):
         try:
             if self.json:
-                level = J_Path.get_Match (f"result..players[?(@.player_id == '{player_id}')].level", self.json, "Not Found")
+                level = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].level", self.json, "Not Found")
 
                 if level != "Not Found":
                     return level
@@ -324,7 +324,7 @@ class InGamePlayers ():
     def is_Ingame_Player_VIP (self, player_id):
         try:
             if self.json:
-                vip = J_Path.get_Match (f"result..players[?(@.player_id == '{player_id}')].is_vip", self.json, "Not Found")
+                vip = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].is_vip", self.json, "Not Found")
 
                 if vip and vip != "Not Found":
                     return True
@@ -341,7 +341,7 @@ class InGamePlayers ():
     def get_Ingame_Player_Name (self, player_id):
         try:
             if self.json:
-                name = J_Path.get_Match (f"result..players[?(@.player_id == '{player_id}')].name", self.json, "Not Found")
+                name = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].name", self.json, "Not Found")
 
                 return name                
             else:
@@ -357,8 +357,13 @@ class InGamePlayers ():
 
                 if fraction != "both":
                     players = J_Path.get_Matches (f"$.result.{fraction}[*]..players[*].player_id", self.json)
+                    commander = J_Path.get_Matches (f"$.result.{fraction}[*]..commander[*].player_id", self.json)
+                    players.extend (commander)
+
                 else:
                     players = J_Path.get_Matches (f"$.result..players[*].player_id", self.json)
+                    commander = J_Path.get_Matches (f"$.result..commander[*].player_id", self.json)
+                    players.extend (commander)
 
                 return players                
             else:
@@ -427,6 +432,9 @@ class RecentLogs():
         self.logs = []
         self.json = None
 
+    def add_Json (self, json_string):
+        self.json = json_string
+
     def get_Timestamp (self, player_id):
         try:
             if self.json:
@@ -446,7 +454,63 @@ class RecentLogs():
             self.logs = J_Path.get_Matches ("$..logs[*].message", json_string)       
             logger.debug ("Message :" + str (self.logs))
         except:
-            logger.error ("Exception in RecentLogs")      
+            logger.error ("Exception in RecentLogs")
+        
+    def get_LogItem (self, item, attibute = None):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}].{str(attibute)}", self.json, "Not Found")
+                else:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}]", self.json, "Not Found")
+
+                if log_item != "Not Found":
+                    return log_item
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+class StructuredLogs():
+    def __init__(self):
+        self.logs = []
+        self.json = None
+
+    def add_Json (self, json_string):
+        self.json = json_string   
+
+    def parse_Json (self, json_string):
+        try:    
+            self.json = json_string
+            self.logs = J_Path.get_Matches ("$..logs[*].message", json_string)       
+            logger.debug ("Message :" + str (self.logs))
+        except:
+            logger.error ("Exception in StructuredLogs")
+        
+    def get_LogItem (self, item, attibute = None):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}].{str(attibute)}", self.json, "Not Found")
+                else:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}]", self.json, "Not Found")
+
+                if log_item != "Not Found":
+                    return log_item
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
 
 class ServerStatus():
     def __init__(self):
