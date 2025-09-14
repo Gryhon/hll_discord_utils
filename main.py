@@ -39,7 +39,7 @@ async def main():
     logger = logging.getLogger(__name__)
 
     #await update_Config ()
-    logger.waring(f"Note to myself: Update Config is disabled for now.")
+    logger.warning(f"Note to myself: Update Config is disabled for now.")
 
     await RconV2.Connect()
 
