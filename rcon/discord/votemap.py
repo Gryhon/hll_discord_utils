@@ -3,8 +3,10 @@ import logging
 import asyncio
 import random
 import time
+import lib.utils as utils
 import rcon.model as model
 import rcon.rcon as rcon
+from enum import Enum
 from typing import List
 from dateutil.parser import parse
 from rcon.discord.discordbase import DiscordBase 
@@ -16,6 +18,11 @@ from datetime import timedelta, datetime
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
+
+class Status(Enum):
+    PAUSE = 1
+    RESUME = 2
+    UNKNOWN = 3
 
 class VoteMap(commands.Cog, DiscordBase):
     def __init__(self, bot):
@@ -36,9 +43,17 @@ class VoteMap(commands.Cog, DiscordBase):
                             "   We will inform you in the channel\n"
                             "  when the function is enabled again.\n\n"
                             "             Stay tuned!\n\n")
+        self.scheduler_message = ("\n\n"
+                            "       Vote function is paused!\n\n"
+                            "     paused per schedule between\n"
+                            "        ** {off} and {on} **\n\n"
+                            "             Stay tuned!\n\n")
         self.vote_channel_id = config.get("rcon", 0, "map_vote", 0, "vote_channel_id") 
         self.vote_channel = None   
-        self.loop_started = False  
+        self.loop_started = False
+        self.admin_overrule = Status.UNKNOWN
+        self.scheduler_messager = None
+        self.scheduler_invalid = True
 
     # used by pause vote manually or when occurring an exception
     def reset_Vote_Variables(self):        
@@ -57,11 +72,14 @@ class VoteMap(commands.Cog, DiscordBase):
         self.send_seeding_message = True
         self.seeded = False
 
-    async def send_Pause_Message (self):
+    async def send_Pause_Message (self, content=None):
         try:
+            if content is None:
+                content = self.pause_message
+
             message = (
                 f"""
-                    ```  {self.pause_message} ```
+                    ```  {content} ```
                 """
             )
             self.seeding_msg = await self.vote_channel.send(message)
@@ -373,7 +391,28 @@ class VoteMap(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return []
-        
+
+    async def get_Map_Pool_Counter (self):
+        try:
+            index = 0
+
+            if self.scheduler_messager != None and not self.scheduler_invalid:
+                profile = self.scheduler_messager.get_value ("profile")
+
+                map_pool = config.get_node ("rcon", 0, "map_vote", 0, "map_pool", default=[])
+
+                if len (map_pool) > 0:
+                    for i, p in enumerate(map_pool):
+                        if p.get("profile") == profile:
+                            index = i
+                            break
+            
+            return index
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return 0
+
     async def get_Maps_To_Vote (self):
         try:
             duplicate_maps = config.get("rcon", 0, "map_vote", 0, "duplicate_maps")
@@ -381,11 +420,14 @@ class VoteMap(commands.Cog, DiscordBase):
             last_maps = []
             blacklist = []
 
-            modes = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "battle_mode")
-            blacklist = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "blacklist_maps")
+            index = await self.get_Map_Pool_Counter ()
+            logger.info (f"Using map pool profile index: {index}")
+
+            modes = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "battle_mode")
+            blacklist = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "blacklist_maps")
             logger.info (f"Blacklist: {blacklist}")
 
-            last_maps = list(set(await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "exclude_played_maps"))))
+            last_maps = list(set(await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", index, "exclude_played_maps"))))
             logger.info(f"Updated last_maps list (used to exclude maps): {last_maps}")
 
             if last_maps is not None:
@@ -394,11 +436,11 @@ class VoteMap(commands.Cog, DiscordBase):
 
             all_maps = await rcon.get_Maps ()
 
-            day_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "day")
+            day_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "day")
 
             if day_cnt > 0:
                 day_list = all_maps.get_Map_Names (["day", "dusk", "overcast"], modes, blacklist, duplicate_maps)
-
+                logger.info (f"Day list before random selection: {day_list}")
                 day_list = await self.get_Random_Items (day_list, day_cnt)
                 result.extend (day_list)
                 logger.info (f"{day_cnt} random day maps: {day_list}")
@@ -407,7 +449,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     blacklist.extend (all_maps.change_Maps_Enviroment (day_list, "night"))
                     logger.info (f"Updated (duplicate_maps) blacklist: {blacklist}")
 
-            night_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "night")
+            night_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "night")
 
             if night_cnt > 0:
                 night_list = all_maps.get_Map_Names (["night"], modes, blacklist)
@@ -415,16 +457,16 @@ class VoteMap(commands.Cog, DiscordBase):
                 result.extend (night_list)
                 logger.info (f"{night_cnt} random night maps: {night_list}")
 
-            enforced_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "enforce")
-            enforced_list = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "enforced_maps")
+            enforced_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "enforce")
+            enforced_list = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "enforced_maps")
 
             if enforced_cnt > 0:
                 result = await self.enforce_Match (result, enforced_list, enforced_cnt)
 
-            wildcard_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "wildcard")
+            wildcard_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "wildcard")
 
             if wildcard_cnt > 0:
-                wildcard_mode = config.get("rcon", 0, "map_vote", 0, "map_pool", 0, "wildcard_mode")
+                wildcard_mode = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "wildcard_mode")
                 wildcard_list = all_maps.get_Map_Names (["night", "day"], wildcard_mode, blacklist)
 
                 wildcard_list = await self.get_Random_Items (wildcard_list, wildcard_cnt)
@@ -553,6 +595,7 @@ class VoteMap(commands.Cog, DiscordBase):
     
     async def check_Origin_Map_Rotation (self):
         try:
+            logger.warning (f"*** Method need test and code review ***")
             map_rotation = await rcon.get_Map_Rotation ()
 
             if len (map_rotation.maps) > 1:
@@ -572,8 +615,22 @@ class VoteMap(commands.Cog, DiscordBase):
                         logger.info ("Update origin map rotation")
 
             if (self.seeded == False and len (map_rotation.maps) == 1) or (self.do_map_vote == False and len (map_rotation.maps) == 1):
+                maps = "|".join(map.id for map in map_rotation.maps)
+
                 rotation = self.select_Key_Value ("Origin_Map_Rotation")
-                await self.set_Map (rotation.split("|"))
+
+                if rotation == None:
+                    self.insert_Key_Value ("Origin_Map_Rotation", maps)
+                    logger.info ("Insert origin map rotation")
+                else:
+                    set1 = set(maps.split("|"))
+                    set2 = set(rotation.split("|"))
+
+                    if set1 != set2:
+                        self.update_Key_Value ("Origin_Map_Rotation", maps)
+                        logger.info ("Update origin map rotation")
+
+                #await self.set_Map (rotation.split("|"))
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -656,12 +713,104 @@ class VoteMap(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             self.do_map_vote = False
+    
+    async def generate_Schedule_Log (self, schedule):
+        try:
+            log_lines = []
+
+            for day, periods in schedule.items():
+                day_log = []
+                for start, end, status in periods:
+                    s_hour, s_min = map(int, start.split(':'))
+                    e_hour, e_min = map(int, end.split(':'))
+                    if e_hour < s_hour or (e_hour == s_hour and e_min < s_min):
+                        end = '24:00'
+                    day_log.append(f"{start}-{end}({status})")
+                log_lines.append(f"{day}: {', '.join(day_log)}")
+
+            return log_lines
+        
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return []
+
+    async def prepare_scheduler(self):
+        try:
+            shedule = config.get_node ("rcon", 0, "map_vote", 0, "schedule", default=None)
+
+            if shedule is None or len (shedule) > 0:
+
+                self.scheduler_messager = utils.ScheduleManager (shedule)
+                errors = self.scheduler_messager.validate ()
+
+                if len (errors) > 0:
+                    self.scheduler_invalid = True
+                    logger.error (f"Schedule is invalid: {errors}")
+                    logger.info ("Vote map is always active!")    
+                else:
+                    self.scheduler_invalid = False
+
+                if not self.scheduler_invalid:
+                    timeline = await self.generate_Schedule_Log(self.scheduler_messager.get_timeline ())
+
+                    for line in timeline:
+                        logger.info(f"Schedule on {line}")      
+                        
+            else:
+                logger.warning ("No schedule configured. Vote map is always active!")
+            
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return True   
+        
+    async def check_schedule(self):
+        try:
+            if not self.scheduler_invalid and self.scheduler_messager != None and self.admin_overrule != Status.PAUSE:
+
+                paused = self.scheduler_messager.is_paused ()
+
+                if paused and self.vote_map_active and self.admin_overrule != Status.RESUME:
+
+                    self.vote_map_active = False
+                    self.admin_overrule = Status.UNKNOWN
+                    logger.info (f"Vote map paused by scheduler!")
+                        
+                    while self.do_map_vote == True:
+                        logger.info ("Method do_Map_Vote () is in execution")
+                        await asyncio.sleep (1)   
+
+                    if self.seeded:
+                        await self.stop_Vote ()
+                        await self.check_Origin_Map_Rotation ()
+
+                    await self.clear_All_Messages (None, False)                
+                    window = self.scheduler_messager.get_current_window_times ()
+                    
+                    await self.send_Pause_Message (self.scheduler_message.format(off=window[0], on=window[1]))
+
+                    self.reset_Vote_Variables()
+
+                elif not paused and (self.admin_overrule == Status.RESUME or not self.vote_map_active):
+                    self.vote_map_active = True
+
+                    if self.admin_overrule == Status.RESUME:
+                        self.admin_overrule = Status.UNKNOWN
+                        logger.info (f"Reset admin resume override!")
+                    else:
+                        logger.info (f"Vote map started by scheduler!")
+                    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
 
     async def background_task(self):
         try:
             self.vote_channel = self.bot.get_channel(self.vote_channel_id)
+            await self.prepare_scheduler ()
 
-            while not self.shutdown_event.is_set():            
+            while not self.shutdown_event.is_set():   
+
+                await self.check_schedule()  
                 
                 if self.vote_map_active:
                     try:
@@ -688,8 +837,9 @@ class VoteMap(commands.Cog, DiscordBase):
 
         if action == "pause" and self.vote_map_active:
             self.vote_map_active = False       
+            self.admin_overrule = Status.PAUSE
 
-            logger.info (f"Vote map paused by {interaction.user.name}!")    
+            logger.warning (f"Vote map paused (admin overwrite) by {interaction.user.name}!")    
             await interaction.response.send_message(f"Vote map paused by {interaction.user.name}!", ephemeral=False)
             
             while self.do_map_vote == True:
@@ -700,18 +850,28 @@ class VoteMap(commands.Cog, DiscordBase):
                 await self.stop_Vote ()
                 await self.check_Origin_Map_Rotation ()
 
-            await self.clear_All_Messages (None, False)                
+            await self.clear_All_Messages (None, False)
             await self.send_Pause_Message ()
 
             self.reset_Vote_Variables()
 
+        elif action == "pause" and not self.vote_map_active:
+            self.admin_overrule = Status.PAUSE
+
+            logger.warning (f"Vote map paused (admin overwrite) by {interaction.user.name}!")
+            await interaction.response.send_message(f"Vote map paused by {interaction.user.name}!", ephemeral=False)
+
+            await self.clear_All_Messages (None, False)
+            await self.send_Pause_Message ()
+
         elif action == "resume" and not self.vote_map_active:
             self.vote_map_active = True
+            self.admin_overrule = Status.RESUME
 
-            logger.info (f"Vote map started by {interaction.user.name}!")      
+            logger.warning (f"Vote map started (admin overwrite) by {interaction.user.name}!")      
 
             await interaction.response.send_message(f"Vote map started by {interaction.user.name}!")
-
+            
         elif action == "status" and self.vote_map_active:
             logger.info (f"Get status of Vote map by {interaction.user.name}!")
             await interaction.response.send_message(f"Vote map is running")
