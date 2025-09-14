@@ -6,6 +6,7 @@ import threading
 from lib.config import config
 from lib.configupdater import ConfigUpdater
 from lib.logging import setup_logger
+from lib.rconV2 import RconV2
 from rcon.discord.bot import start_bot, shutdown_bot
 
 config_name = "config.json"
@@ -37,7 +38,10 @@ async def main():
     
     logger = logging.getLogger(__name__)
 
-    await update_Config ()
+    #await update_Config ()
+    logger.waring(f"Note to myself: Update Config is disabled for now.")
+
+    await RconV2.Connect()
 
     killer = GracefulKiller()
     logger.info("Program started. Press Ctrl+C to exit the program.")
