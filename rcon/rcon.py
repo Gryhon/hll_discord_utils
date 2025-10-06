@@ -191,6 +191,47 @@ async def get_Structured_Logs (payload, generic_class = None):
         return logs
     else:
         return None
+    
+async def get_Historical_Logs (payload, generic_class = None):
+    data = await get_Data ("/api/get_historical_logs", payload)
+
+    if data and generic_class:
+        generic = generic_class()
+        generic.parse_Json(data)
+
+        return generic
+    
+    elif data and not generic_class:
+        logs = model.HistoricalLogs()
+        logs.parse_Json(data)
+        
+        return logs
+    else:
+        return None
+
+async def get_Live_Scoreboard ():
+    data = await get_Data ("/api/get_live_scoreboard")
+
+    if data:
+        scoreboard = model.LiveScoreboard()
+        
+        scoreboard.parse_Json(data)
+        
+        return scoreboard
+    else:
+        return None
+
+async def get_Live_Game_Stats ():
+    data = await get_Data ("/api/get_live_game_stats")
+
+    if data:
+        scoreboard = model.LiveGameStats()
+        
+        scoreboard.parse_Json(data)
+        
+        return scoreboard
+    else:
+        return None
 
 async def get_Players ():
     data = await get_Data ("/api/get_players")

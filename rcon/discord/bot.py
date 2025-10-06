@@ -13,7 +13,12 @@ from rcon.discord.comfort import BroadcastMessage, AfterGameMessage, AutoUnban
 from rcon.discord.artillerycalculator import ArtilleryCalculator
 from rcon.discord.registration import Registration
 from rcon.discord.unregister import Unregister
-from rcon.discord.commands import PunishMe, SwitchMe, WhoKilledMe, WhomIKilled, RemovePlayerFromSquad
+from rcon.discord.inappropriate import Inappropriate
+from rcon.discord.whokilledme import WhoKilledMe
+from rcon.discord.whomikilled import WhomIKilled 
+from rcon.discord.switchme import SwitchMe
+from rcon.discord.punishme import PunishMe
+from rcon.discord.removeplayerfromsquad import RemovePlayerFromSquad
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -93,7 +98,11 @@ class MainBot(commands.Bot):
 
             if (config.get("rcon", 0, "discord_commands", 0, "remove_player_from_squad", 0, "enabled")):      
                 await self.add_cog(RemovePlayerFromSquad(self))
-            
+        
+        if (config.get("rcon", 0, "inappropriate_name", 0, "enabled")):
+            logger.info ("Start inappropriate name")
+            await self.add_cog(Inappropriate(self))  
+
         await self.tree.sync()
         logger.info ("Slash commands have been synced.")
        

@@ -46,6 +46,7 @@ if [[ "$VIRTUAL_ENV" != "" ]]; then
     if [ -f "requirements.txt" ]; then
         echo "Installing required packages from requirements.txt..."
         pip install --upgrade pip
+        pip install pytest
         pip install -r requirements.txt
         echo "Packages installed successfully."
     else

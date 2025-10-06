@@ -1,6 +1,7 @@
 import aiohttp
 import json
 import logging
+from lib.jsonxpath import JSONXPath
 import jmespath
 import jsonpath_ng.ext as jpath
 from lib.config import config
@@ -353,7 +354,33 @@ class J_Path ():
         except:
             logger.error ("Exception while parsing path: " + path + "in json: " + json_string)
 
-# uses jmespath and dos not support recrusive search but and and or operations
+class J_XPath ():
+    def get_Match (path, json_string, not_match=""):
+        try:
+            match = JSONXPath.search(path, data=json_string)
+
+            if match:
+                return match
+            else:
+                return not_match
+            
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return not_match
+        
+    def get_Parent (path, json_string, depth=1):
+        try:
+            match = JSONXPath.get_parent_key(path, data=json_string, depth=depth)
+
+            if match:
+                return match
+            else:
+                return None
+            
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
 class Jmes_Path ():
     def get_Match (path, json_string, not_match=""):
         try:
@@ -387,3 +414,17 @@ def is_Time(value: str):
     except (ValueError, TypeError):
         raise ValueError(f"Invalid time format: {value!r}, expected format HH:MM")
 
+def get_last_parenthesis_content(text):
+        # Go through the text backwards.
+        open_paren = None
+        close_paren = None
+        for i in range(len(text) - 1, -1, -1):
+            if text[i] == ')':
+                close_paren = i
+            elif text[i] == '(':
+                open_paren = i
+                if close_paren is not None:
+                    # Extract the content between the brackets.
+                    return text[open_paren + 1:close_paren]
+        
+        return None  # If no brackets are found.
