@@ -370,8 +370,35 @@ class VoteMap(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None
-        
-    async def enforce_Match (self, liste1, liste2, match_count):
+
+    async def enforce_Match(self, liste1, liste2, match_count):
+        try:
+            enforce_list = list(liste1)
+
+            # aktuelle Matches zählen
+            matches = set(liste1) & set(liste2)
+
+            if len(matches) < match_count:
+                missing = match_count #- len(matches)
+
+                # nur Namen aus liste2, die NICHT schon in liste1 vorkommen
+                candidates = list(set(liste2) - set(liste1))
+
+                if len(candidates) < missing:
+                    logger.warning("Nicht genug neue Kandidaten in liste2 vorhanden, um match_count voll zu erfüllen!")
+
+                # so viele zufällige Namen wie fehlen (oder weniger, wenn nicht genug Kandidaten da sind)
+                enforced = random.sample(candidates, min(len(candidates), missing))
+
+                enforce_list.extend(enforced)
+
+            return enforce_list
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}", exc_info=True)
+            return []
+
+    async def enforce_Match_org (self, liste1, liste2, match_count):
         try:
             enforce_list = []
 
@@ -448,7 +475,7 @@ class VoteMap(commands.Cog, DiscordBase):
                 if duplicate_maps == False:
                     blacklist.extend (all_maps.change_Maps_Enviroment (day_list, "night"))
                     logger.info (f"Updated (duplicate_maps) blacklist: {blacklist}")
-
+            
             night_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "night")
 
             if night_cnt > 0:
@@ -582,9 +609,9 @@ class VoteMap(commands.Cog, DiscordBase):
                     data = None
 
                     data = {"player_id": str (player.player_id) , "message": config.get("rcon", 0, "map_vote", 0, "vote_header") + "\n\n" + str (Text) }   
-                        
+
                     if data and config.get("rcon", 0, "map_vote", 0, "stealth_vote") == False:
-                        if not (config.get("rcon", 0, "map_vote", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands"):
+                        if not (config.get("rcon", 0, "map_vote", 0, "dryrun", default=False)) or player.player_id in config.get("rcon", 0, "map_vote", 0, "probands", default=[]):
                             logger.debug("Vote message: " + str (data)) 
                             await rcon.send_Player_Message (data)
                 else:
@@ -593,12 +620,12 @@ class VoteMap(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")                
     
-    async def check_Origin_Map_Rotation (self):
+    async def save_Origin_Map_Rotation (self):
         try:
-            logger.warning (f"*** Method need test and code review ***")
+            logger.info (f"Saveing origin map rotation")
             map_rotation = await rcon.get_Map_Rotation ()
 
-            if len (map_rotation.maps) > 1:
+            if len(map_rotation.maps) > 1 or (len(map_rotation.maps) == 1 and (not self.seeded or not self.do_map_vote)):
                 maps = "|".join(map.id for map in map_rotation.maps)
 
                 rotation = self.select_Key_Value ("Origin_Map_Rotation")
@@ -612,25 +639,26 @@ class VoteMap(commands.Cog, DiscordBase):
 
                     if set1 != set2:
                         self.update_Key_Value ("Origin_Map_Rotation", maps)
-                        logger.info ("Update origin map rotation")
+                        logger.info ("Update origin map rotation")            
 
-            if (self.seeded == False and len (map_rotation.maps) == 1) or (self.do_map_vote == False and len (map_rotation.maps) == 1):
-                maps = "|".join(map.id for map in map_rotation.maps)
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
 
+    async def restore_Origin_Map_Rotation (self):
+        try:
+            logger.info (f"Restoring origin map rotation")
+            if self.seeded == False or self.do_map_vote == False:
                 rotation = self.select_Key_Value ("Origin_Map_Rotation")
 
-                if rotation == None:
-                    self.insert_Key_Value ("Origin_Map_Rotation", maps)
-                    logger.info ("Insert origin map rotation")
+                if rotation:
+                    maps = rotation.split("|") if "|" in rotation else [rotation]
+
+                    if not (config.get("rcon", 0, "map_vote", 0, "dryrun")):
+                        await self.set_Map(maps)
+                    else:
+                        logger.info ("Dry run map: " + str (maps) + " not set!")
                 else:
-                    set1 = set(maps.split("|"))
-                    set2 = set(rotation.split("|"))
-
-                    if set1 != set2:
-                        self.update_Key_Value ("Origin_Map_Rotation", maps)
-                        logger.info ("Update origin map rotation")
-
-                #await self.set_Map (rotation.split("|"))
+                    logger.warning("No Origin_Map_Rotation found to restore")
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -646,13 +674,12 @@ class VoteMap(commands.Cog, DiscordBase):
                 if server_status.current_players >= config.get("rcon", 0, "map_vote", 0, "activate_vote") and not self.seeded:
                     logger.info (f"Server reached {config.get("rcon", 0, "map_vote", 0, "activate_vote")} player and vote map is active!")
                     self.seeded = True
-                    await self.check_Origin_Map_Rotation ()
+                    await self.save_Origin_Map_Rotation ()
 
                 elif server_status.current_players <= config.get("rcon", 0, "map_vote", 0, "dectivate_vote"):
                     if self.seeded:
+                        await self.restore_Origin_Map_Rotation ()
                         logger.info (f"Server drops below or equal to {config.get("rcon", 0, "map_vote", 0, "dectivate_vote")} player and vote map is now deactive!")
-                    
-                    await self.check_Origin_Map_Rotation ()
 
                     self.seeded = False
                     
@@ -781,7 +808,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
                     if self.seeded:
                         await self.stop_Vote ()
-                        await self.check_Origin_Map_Rotation ()
+                        await self.restore_Origin_Map_Rotation ()
 
                     await self.clear_All_Messages (None, False)                
                     window = self.scheduler_messager.get_current_window_times ()
@@ -848,7 +875,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
             if self.seeded:
                 await self.stop_Vote ()
-                await self.check_Origin_Map_Rotation ()
+                await self.restore_Origin_Map_Rotation ()
 
             await self.clear_All_Messages (None, False)
             await self.send_Pause_Message ()
