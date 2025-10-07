@@ -82,8 +82,8 @@ class Inappropriate (commands.Cog, DiscordBase):
                 if trashhold >= config.get("rcon", 0, "inappropriate_name", 0, "threshold", default=0.75):
                     logger.error (f"Checked: Name: {player.name} Trashhold: {trashhold} Finding: {finding}")
                     # ToDo: Send message to discord and admin
-                #else:
-                #    logger.info (f"Checked: Name: {player.name} Trashhold: {trashhold} Finding: {finding}")                                           
+                else:
+                    logger.debug (f"Checked: Name: {player.name} Trashhold: {trashhold} Finding: {finding}")                                           
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
