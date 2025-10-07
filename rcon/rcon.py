@@ -254,7 +254,7 @@ async def get_Map_History (cnt):
         return None 
 
 async def set_Map_Rotation (payload):
-    await post_Data ("/api/set_maprotation", payload)
+    await post_Data ("/api/set_map_rotation", payload)
 
 async def send_Player_Message (message):
     await post_Data ("/api/message_player", message)
