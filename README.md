@@ -56,5 +56,6 @@ CRCON is mainly designed and developed for PC gamers. For example, it is not pos
   - [v1.1.1 -> v1.1.2](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v111-to-v112)
   - [v1.1.2 -> v1.1.3](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v112-to-v113)
   - [v1.1.3 -> v1.1.4](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v113-to-v114)
+  - [v1.1.4 -> v1.1.5](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v114-to-v115)
 
 - [FAQ](https://github.com/Gryhon/hll_discord_utils/wiki/FAQ)
