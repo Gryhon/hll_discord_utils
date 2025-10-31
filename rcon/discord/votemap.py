@@ -421,7 +421,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
     async def get_Map_Pool_Counter (self):
         try:
-            index = 0
+            index = -1
 
             if self.scheduler_messager != None and not self.scheduler_invalid:
                 profile = self.scheduler_messager.get_value ("profile")
@@ -434,6 +434,10 @@ class VoteMap(commands.Cog, DiscordBase):
                             index = i
                             break
             
+            if index == -1:
+                index = 0
+                logger.warning (f"No valid profile found in schedule. Using default map pool profile index: {index}")
+
             return index
 
         except Exception as e:
@@ -454,10 +458,10 @@ class VoteMap(commands.Cog, DiscordBase):
             blacklist = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "blacklist_maps")
             logger.info (f"Blacklist: {blacklist}")
 
-            last_maps = list(set(await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", index, "exclude_played_maps"))))
+            last_maps = list(set(await rcon.get_Map_History (config.get("rcon", 0, "map_vote", 0, "map_pool", index, "exclude_played_maps", default=0)) or []))
             logger.info(f"Updated last_maps list (used to exclude maps): {last_maps}")
 
-            if last_maps is not None:
+            if last_maps is not None or last_maps != 0:
                 blacklist.extend (last_maps)
                 logger.info (f"Updated blacklist: {blacklist} (added last played maps)")
 
@@ -765,10 +769,12 @@ class VoteMap(commands.Cog, DiscordBase):
         try:
             shedule = config.get_node ("rcon", 0, "map_vote", 0, "schedule", default=None)
 
-            if shedule is None or len (shedule) > 0:
+            logger.info (f"{shedule}")
+
+            if shedule is not None:
 
                 self.scheduler_messager = utils.ScheduleManager (shedule)
-                errors = self.scheduler_messager.validate ()
+                errors = self.scheduler_messager.validate () 
 
                 if len (errors) > 0:
                     self.scheduler_invalid = True

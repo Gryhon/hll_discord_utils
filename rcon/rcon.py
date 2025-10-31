@@ -284,7 +284,7 @@ async def get_Maps ():
 async def get_Map_History (cnt):
     data = await get_Data ("/api/get_map_history")
 
-    if data:
+    if data and cnt > 0:
         maps = model.MapHistory()
         
         maps.add_Json(data)
