@@ -13,7 +13,7 @@ from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
 from discord import app_commands
 from lib.config import config
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 
 # get Logger for this modul
@@ -54,6 +54,9 @@ class VoteMap(commands.Cog, DiscordBase):
         self.admin_overrule = Status.UNKNOWN
         self.scheduler_messager = None
         self.scheduler_invalid = True
+        self.webhook_url = config.get("rcon", 0, "map_vote", 0, "webhook", default="")
+        self.webhook = (discord.SyncWebhook.from_url(self.webhook_url) if len (self.webhook_url) > 0 else None)
+
 
     # used by pause vote manually or when occurring an exception
     def reset_Vote_Variables(self):        
@@ -398,27 +401,6 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}", exc_info=True)
             return []
 
-    async def enforce_Match_org (self, liste1, liste2, match_count):
-        try:
-            enforce_list = []
-
-            matches = set(liste1) & set(liste2)
-
-            if len(matches) < match_count:
-                enforce_list = await self.get_Random_Items(liste1, max (len (liste1), len (liste1) - match_count))
-                enforced = await self.get_Random_Items(liste2, match_count)
-                logger.info (f"No match! Injection is enforced!")
-
-                enforce_list.extend (enforced)
-            else:
-                enforce_list = liste1
-           
-            return enforce_list
-        
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return []
-
     async def get_Map_Pool_Counter (self):
         try:
             index = -1
@@ -514,6 +496,75 @@ class VoteMap(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return []
+
+    async def generate_Table(self, data, map_w=16, name_w=16, header_left="Map", header_right="global_name"):
+        def cut(s, w):
+            t = "" if s is None else str(s)
+            return (t[:max(0, w-1)] + "…") if len(t) > w else t
+        
+        def lpad(s, w): 
+            t = cut(s, w)
+            return " " * (w - len(t)) + t
+        
+        def rpad(s, w): 
+            t = cut(s, w)
+            return t + " " * (w - len(t))
+        
+        def cpad(s, w):
+            t = cut(s, w); total = w - len(t); left = total // 2; right = total - left
+            return " " * left + t + " " * right
+
+        total_w = map_w + 3 + name_w
+        lines = ["```"]
+        lines.append(f"{cpad('Map', map_w)} | {cpad('Player', name_w)}")
+        lines.append("-" * total_w)
+
+        for entry in data:
+            map_name = str(entry[0]) if isinstance(entry, (list, tuple)) and len(entry) >= 1 and entry[0] is not None else ""
+            members = entry[2] if isinstance(entry, (list, tuple)) and len(entry) >= 3 and isinstance(entry[2], list) else []
+
+            players = []
+            i = 0
+            while i < len(members):
+                g = getattr(members[i], "global_name", None)
+                if g: players.append(str(g))
+                i += 1
+
+            if len(players) == 0:
+                lines.append(f"{lpad(map_name, map_w)} | ")
+                lines.append("")
+            else:
+                lines.append(f"{lpad(map_name, map_w)} | {rpad(players[0], name_w)}")
+                j = 1
+                while j < len(players):
+                    lines.append(f"{' ' * map_w} | {rpad(players[j], name_w)}")
+                    j += 1
+                lines.append("")
+
+        lines.append("```")
+        return "\n".join(lines)
+
+    async def create_Audit_Log_Message (self):
+        try:
+            if len (self.webhook_url) >= 0:
+                votes = await self.get_Results ()
+                table = await self.generate_Table (votes)
+            
+                wt = discord.Embed(
+                    title="Map Vote result by user:",
+                    description="",
+                    color=discord.Color.green(),
+                )
+   
+                wt.add_field(name="", value=table, inline=False) 
+            
+                wt.set_footer(text=f"(Provided by Gryhon)")
+                wt.timestamp = datetime.now(timezone.utc)
+            
+                self.webhook.send(embeds=[wt], wait=True).id
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
 
     async def start_Vote (self):
         try:
@@ -702,6 +753,7 @@ class VoteMap(commands.Cog, DiscordBase):
                 elif not self.game_active and self.vote_active:
                     logger.info ("Game over vote is being stopped...")
 
+                    await self.create_Audit_Log_Message ()
                     await self.stop_Vote ()
                     self.vote_active = False
                     self.last_execution = None
