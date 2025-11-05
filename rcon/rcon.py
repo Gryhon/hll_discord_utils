@@ -331,4 +331,7 @@ async def add_Blacklist_Record (payload):
     print (payload)
     await post_Data ("/api/add_blacklist_record", payload)
 
+async def remove_from_squad (payload):
+    await post_Data ("/api/remove_player_from_squad", payload)
+
     
