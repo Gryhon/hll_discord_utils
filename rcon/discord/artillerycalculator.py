@@ -85,7 +85,7 @@ class ArtilleryCalculator (commands.Cog, DiscordBase):
             logger.exception("Unexpected error")
             return None
         
-    async def create_Table(self, meters: list, MILs: list, distance: int):
+    async def create_Table_old(self, meters: list, MILs: list, distance: int):
         try:
             table = "METER  |  MILS\n" + "-" * 16 + "\n"
             for m, mil in zip(meters, MILs):
@@ -95,6 +95,35 @@ class ArtilleryCalculator (commands.Cog, DiscordBase):
             
             return table
         
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+    async def create_Table(self, meters: list, MILs: list, distance: int):
+        try:
+            FS   = "\u2007"  # FIGURE SPACE
+            NBSP = "\u00A0"  # NO-BREAK SPACE
+
+            digits_tab = str.maketrans("0123456789", "０１２３４５６７８９")
+
+            header = f"{FS*4}METER{FS*2}{FS*4}MILS"
+            sep    = f"{FS*4}" + "─" * 18
+            lines  = [header, sep]
+
+            for m, mil in zip(meters, MILs):
+                is_sel = (m == distance)
+
+                mark_left  = f"{FS}-->{NBSP}" if is_sel else FS * 4
+                mark_right = f"{NBSP}<--" if is_sel else ""
+
+                m_str   = f"{m:04}".translate(digits_tab)
+                mil_str = f"{mil:04}".translate(digits_tab)
+
+                line = f"{mark_left}{m_str}{FS*2}|{FS*2}{mil_str}{mark_right}"
+                lines.append(line)
+
+            return "\n".join(lines)
+
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None
