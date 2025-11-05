@@ -40,12 +40,12 @@ class PunishMe (commands.Cog, DiscordBase):
 
                     if ingame.is_Player_Ingame (player_id) == True:
                          
-                        data = {"player_name": str(ingame.get_Ingame_Player_Name (player_id)), "reason": "Because you said so! (Respawn)"}
+                        data = {"player_id": str (player_id), "player_name": str(ingame.get_Ingame_Player_Name (player_id)), "reason": "Because you said so! (Respawn)"}
 
                         await rcon.Punish_Player(data)
                         await safe_send(interaction, "✅ done")
 
-                        logger.info(f"Punish player {player_id} ({data['player_name']}) by {interaction.user.name}.")
+                        logger.info(f"Punish player {player_id} ({data['player_id']}) by {interaction.user.name}.")
                     else:
                         await safe_send(interaction, "❌ You are not ingame. Please join a server first.")
                         logger.info(f"{interaction.user.name} is not ingame. Cannot execute punish_me command.")
