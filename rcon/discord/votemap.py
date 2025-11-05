@@ -54,7 +54,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.admin_overrule = Status.UNKNOWN
         self.scheduler_messager = None
         self.scheduler_invalid = True
-        self.webhook_url = config.get("rcon", 0, "map_vote", 0, "webhook", default="")
+        self.webhook_url = config.get("rcon", 0, "map_vote", 0, "audit_webhook", default="")
         self.webhook = (discord.SyncWebhook.from_url(self.webhook_url) if len (self.webhook_url) > 0 else None)
 
 
@@ -645,7 +645,8 @@ class VoteMap(commands.Cog, DiscordBase):
 
             elif reminder and len (self.vote_results):
                 for map in self.vote_results:
-                    Text += str (map[0]) + " - " + str (map[1]) + " votes\n"
+                    Text += str (map[1]) + " votes" + " - " + str (map[0]) + "\n"
+                
                 logger.debug("Preparing reminder message with current vote counts")
 
             players = await rcon.get_Players ()
@@ -659,7 +660,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
                     if ask_reg_cnt != None:
                         wants_reminders = bool(ask_reg_cnt)
-
+                
                 if (voters is None or player.player_id not in voters) and not (reminder and not wants_reminders):
                     data = None
 
