@@ -13,6 +13,7 @@ from rcon.discord.comfort import Comfort
 from rcon.discord.artillerycalculator import ArtilleryCalculator
 from rcon.discord.registration import Registration
 from rcon.discord.unregister import Unregister
+from rcon.discord.rotationvote import RotationVote
 
 
 # get Logger for this modul
@@ -67,7 +68,11 @@ class MainBot(commands.Bot):
         if (config.get("rcon", 0, "artillery_calculator", 0, "enabled")):
             logger.info ("Start auto artillery calculator")
             await self.add_cog(ArtilleryCalculator(self))             
-            
+
+        if (config.get("rcon", 0, "map_rotation_vote", 0, "enabled")):
+            logger.info ("Start map rotation vote")
+            await self.add_cog(RotationVote(self))
+
         await self.tree.sync()
         logger.info ("Slash commands have been synced.")
        
