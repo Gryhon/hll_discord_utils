@@ -703,18 +703,17 @@ class VoteMap(commands.Cog, DiscordBase):
     async def restore_Origin_Map_Rotation (self):
         try:
             logger.info (f"Restoring origin map rotation")
-            if self.seeded == False or self.do_map_vote == False:
-                rotation = self.select_Key_Value ("Origin_Map_Rotation")
+            rotation = self.select_Key_Value ("Origin_Map_Rotation")
 
-                if rotation:
-                    maps = rotation.split("|") if "|" in rotation else [rotation]
+            if rotation:
+                maps = rotation.split("|") if "|" in rotation else [rotation]
 
-                    if not (config.get("rcon", 0, "map_vote", 0, "dryrun")):
-                        await self.set_Map(maps)
-                    else:
-                        logger.info ("Dry run map: " + str (maps) + " not set!")
+                if not (config.get("rcon", 0, "map_vote", 0, "dryrun")):
+                    await self.set_Map(maps)
                 else:
-                    logger.warning("No Origin_Map_Rotation found to restore")
+                    logger.info ("Dry run map: " + str (maps) + " not set!")
+            else:
+                logger.warning("No Origin_Map_Rotation found to restore")
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
