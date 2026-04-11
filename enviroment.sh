@@ -1,9 +1,18 @@
 #!/bin/bash
 
-rm -r venv
-
-# Name of the virtual environment
 VENV_NAME="venv"
+FORCE=false
+
+for arg in "$@"; do
+    if [ "$arg" = "--force" ] || [ "$arg" = "-f" ]; then
+        FORCE=true
+    fi
+done
+
+if [ "$FORCE" = true ]; then
+    echo "Force mode: removing existing virtual environment..."
+    rm -rf "$VENV_NAME"
+fi
 
 if [ -f .python-version ]; then
     PY_VERSION=$(cat .python-version)
@@ -31,7 +40,7 @@ if [ ! -d "$VENV_NAME" ]; then
     python3 -m venv "$VENV_NAME"
     echo "Virtual environment '$VENV_NAME' has been created."
 else
-    echo "The virtual environment '$VENV_NAME' already exists."
+    echo "Virtual environment '$VENV_NAME' already exists, skipping creation. Use --force to recreate."
 fi
 
 # Activate the virtual environment

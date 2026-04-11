@@ -10,10 +10,14 @@ __pycache__/
 *.json.*
 
 # MacOS
+._*
 .DS_Store
 sync.sh
 
 # Project
+.claude/
+.pytest_cache/
+CLAUDE.md
 config.json
 
 hll_discord_helper.db*

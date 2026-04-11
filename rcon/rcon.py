@@ -246,7 +246,7 @@ async def get_Players ():
         return None
     
 async def get_Player_Profile (payload):
-    data = await post_Data ("/api/get_player_profile", payload)
+    data = await get_Data ("/api/get_player_profile", payload)
 
     if data:
         players = model.PlayerProfile()
@@ -295,6 +295,7 @@ async def get_Map_History (cnt):
         return None 
 
 async def set_Map_Rotation (payload):
+    logger.info (f"Setting new map rotation: {payload}")
     await post_Data ("/api/set_map_rotation", payload)
 
 async def send_Player_Message (message):
@@ -324,6 +325,9 @@ async def get_Player_History (payload):
 async def set_Watch_Player (payload):
     await post_Data ("/api/watch_player", payload)
 
+async def set_Unwatch_Player (payload):
+    await post_Data ("/api/unwatch_player", payload)
+
 async def set_Perma_Ban (payload):
     await post_Data ("/api/perma_ban", payload)
 
@@ -331,7 +335,33 @@ async def add_Blacklist_Record (payload):
     print (payload)
     await post_Data ("/api/add_blacklist_record", payload)
 
+async def remove_Blacklist_Record (payload):
+    print (payload)
+    await post_Data ("/api/delete_blacklist_record", payload)
+
 async def remove_from_squad (payload):
     await post_Data ("/api/remove_player_from_squad", payload)
+
+async def search_Players(query: str):
+    """Search player history by name fragment. Returns up to 25 results or None."""
+    logger.info(f"search_Players called with query={query!r}")
+    if len(query) > 1:
+        data = await get_Player_History({"page_size": 25, "page": 1, "player_name": query})
+        if data:
+            players = data.get_Players_Name()
+            logger.info(f"search_Players got {len(players) if players else 0} result(s)")
+            if players:
+                return players[:25]
+        else:
+            logger.warning("search_Players: get_Player_History returned no data")
+    else:
+        logger.info("search_Players: query too short, skipping")
+    return None
+
+async def add_Vip(payload):
+    await post_Data("/api/add_vip", payload)
+
+async def remove_Vip(payload):
+    await post_Data("/api/remove_vip", payload)
 
     

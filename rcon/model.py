@@ -406,6 +406,18 @@ class InGamePlayers ():
             logger.error(f"Unexpected error: {e}")
             return False
         
+    def get_Ingame_Player_ClanTag (self, player_id):
+        try:
+            if self.json:
+                name = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].clan_tag", self.json, "Not Found")
+                return name                
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
+        
     def get_Ingame_Player_From_Fraction (self, fraction):
         try:
             if self.json:
@@ -695,14 +707,14 @@ class MapRotation ():
 
     def parse_Json (self, json_string):
         try:
-            map_ids = J_Path.get_Matches ("$.result[*].id", json_string)
+            map_ids = J_Path.get_Matches ("$.result.maps[*].id", json_string)
 
             for item in map_ids:
                 map = Map ()
                 map.id = item
-                map.pretty_name = J_Path.get_Match ("$.result[?(@.id == \"" + item + "\")].pretty_name", json_string)
-                map.environment = J_Path.get_Match ("$.result[?(@.id == \"" + item + "\")].environment", json_string)
-                map.image_name = J_Path.get_Match ("$.result[?(@.id == \"" + item + "\")].image_name", json_string)
+                map.pretty_name = J_Path.get_Match ("$.result.maps[?(@.id == \"" + item + "\")].pretty_name", json_string)
+                map.environment = J_Path.get_Match ("$.result.maps[?(@.id == \"" + item + "\")].environment", json_string)
+                map.image_name = J_Path.get_Match ("$.result.maps[?(@.id == \"" + item + "\")].image_name", json_string)
                 self.maps.append (map)  
         except:
             logger.error ("Exception in MapRotation")
@@ -863,3 +875,52 @@ class PlayerProfile ():
 
     def is_Blacklisted (self):
         pass
+
+    def get_Player_Name(self):
+        """Returns the most recent player name from the profile, or None if unavailable."""
+        try:
+            name = J_Path.get_Match("$.result.names[0].name", self.json, "Not Found")
+            return name if name and name != "Not Found" else None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def get_Vip_Expiry(self):
+        """Returns VIP expiry as a timezone-aware datetime, or None if the player has no VIP."""
+        try:
+            expiry_str = J_Path.get_Match("$.result.vips[*].expiration", self.json, "Not Found")
+            if expiry_str and expiry_str != "Not Found":
+                from datetime import datetime, timezone
+                dt = datetime.fromisoformat(expiry_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def is_Vip_Permanent(self):
+        """Returns True if the VIP expiry is year 2999 or later (permanent VIP convention)."""
+        try:
+            expiry = self.get_Vip_Expiry()
+            return expiry is not None and expiry.year >= 2999
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
+
+    def get_Vip_Days_Remaining(self):
+        """Returns the number of full VIP days remaining, or 0 if no VIP or expired.
+        Returns -1 for permanent VIP (expiry year >= 2999)."""
+        try:
+            from datetime import datetime, timezone
+            expiry = self.get_Vip_Expiry()
+            if expiry is None:
+                return 0
+            if self.is_Vip_Permanent():
+                return -1
+            delta = expiry - datetime.now(timezone.utc)
+            return max(0, delta.days)
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return 0

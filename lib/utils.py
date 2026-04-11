@@ -32,22 +32,21 @@ async def get_Data_from_Url(url, token, payload=None):
         return None
     
 async def post_data_to_Url(url, token, payload):
-    headers = {
+    header = {
         'Authorization': f'Bearer {token}',
-        "Connection": "keep-alive",
         'Content-Type': 'application/json'
     }
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=json.dumps(payload), headers=headers) as response:
+            async with session.post(url, json = payload, headers=header) as response:
                 # Check whether the request was successful
                 if response.status == 200:
                     return await response.json()
                 else:
                     logger.error(f"Error: {response.status}")
                     logger.info(f"Details: {await response.text()}")
-                    return None
+                    return []
                 
     except aiohttp.ClientConnectionError as error:
         logger.error(f"Connection error: {error}")

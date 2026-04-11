@@ -993,23 +993,7 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
 
     async def query_Player_Database(self, query: str) -> List[str]:
-        try:
-            if len (query) > 1:       
-                payload ={"page_size": 25, "page": 1, "player_name": query}
-
-                result = await rcon.get_Player_History (payload)
-                player = result.get_Players_Name ()
-
-                if player is not None and len (player):
-                    return player[:25]
-                else:
-                    return None
-            else:
-                return None
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return None
+        return await rcon.search_Players(query)
     
     @commands.Cog.listener()
     async def on_raw_poll_vote_remove(self, payload):

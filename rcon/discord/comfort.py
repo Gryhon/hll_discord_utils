@@ -1,6 +1,7 @@
 import discord
 import logging
 import asyncio
+import time
 import rcon.model as model
 import rcon.rcon as rcon
 from typing import List
@@ -8,6 +9,7 @@ from rcon.discord.discordbase import DiscordBase
 from lib.config import config
 from discord.ext import commands
 from discord import app_commands
+from datetime import datetime, timedelta
 
 
 # get Logger for this modul
@@ -166,23 +168,7 @@ class BroadcastMessage (commands.Cog, DiscordBase):
         self.loop_started = False
 
     async def query_Player_Database(self, query: str) -> List[str]:
-        try:
-            if len (query) > 1:       
-                payload ={"page_size": 25, "page": 1, "player_name": query}
-
-                result = await rcon.get_Player_History (payload)
-                players = result.get_Players_Name ()
-
-                if players != None and len (players):
-                    return players[:25]
-                else:
-                    return None
-            else:
-                return None
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return None
+        return await rcon.search_Players(query)
 
     async def send_Broadcast_Message (self, message, players):
         try:
@@ -271,9 +257,45 @@ class AutoUnban (commands.Cog, DiscordBase):
         self.bot = bot
         self.in_Loop = False
         self.loop_started = False
+        self.last_check = None
+
+    async def do_Auto_Unban (self):
+        try:
+            if self.last_check == None:
+                now = datetime.now()
+                self.last_check = now - timedelta(minutes=90)
+                logger.info (f"Initial last check time set to {self.last_check}")
+                        
+            payload = {"action": f"ADMIN BANNED",
+                       "from_": f"{self.last_check}",
+                       "time_sort": "desc"}
+            log_items = await rcon.get_Historical_Logs (payload)
+
+            self.last_check = datetime.now()
+
+            logger.info (f"Auto unban check from {self.last_check}, found {log_items.json} ban log items.")
+        
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
+        
 
     async def background_task(self):
+        last_execution = 0
+
         while not self.shutdown_event.is_set():
+            current_time = time.time()
+
+            if current_time - last_execution >= 60 or last_execution == 0:
+                
+                try:
+                    await self.do_Auto_Unban()
+
+                except Exception as e:
+                    logger.error(f"Unexpected error: {e}")
+            
+                last_execution = current_time
+
             await asyncio.sleep (5)
 
     @commands.Cog.listener()
@@ -281,4 +303,4 @@ class AutoUnban (commands.Cog, DiscordBase):
         if not self.loop_started:
             self.loop_started = True 
             self.bot.loop.create_task(self.background_task())
-            logger.info("Background task (BroadcastMessage) started")
+            logger.info("Background task (AutoUnban) started")

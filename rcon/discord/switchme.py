@@ -5,7 +5,7 @@ import rcon.rcon as rcon
 from rcon.discord.discordbase import DiscordBase 
 from discord.ext import commands
 from discord import app_commands
-from rcon.discord.discordutils import safe_send, has_allowed_role
+from rcon.discord.discordutils import safe_Send, has_Allowed_Role
 
 logger = logging.getLogger(__name__)
 
@@ -25,11 +25,11 @@ class SwitchMe (commands.Cog, DiscordBase):
     async def switch_me(self, interaction: discord.Interaction):
         try:
             if not isinstance(interaction.user, discord.Member):
-                await safe_send(interaction, "❌ This command only works on the server.")
+                await safe_Send(interaction, "❌ This command only works on the server.")
                 logger.info(f"{interaction.user} used command outside the server.")
 
-            elif not has_allowed_role(interaction.user, "punish_me"):
-                await safe_send(interaction, "❌ You do not have permission for this command.")
+            elif not has_Allowed_Role(interaction.user, "punish_me"):
+                await safe_Send(interaction, "❌ You do not have permission for this command.")
                 logger.info(f"{interaction.user} does not have permission to use punish_me command.")
 
             else:
@@ -43,14 +43,14 @@ class SwitchMe (commands.Cog, DiscordBase):
                         data = {"player_id": str(player_id)}
 
                         await rcon.Switch_Player_Now(data)
-                        await safe_send(interaction, "✅ done")
+                        await safe_Send(interaction, "✅ done")
 
                         logger.info(f"Switch player {player_id} ({data['player_id']}) by {interaction.user.name}.")
                     else:
-                        await safe_send(interaction, "❌ You are not ingame. Please join a server first.")
+                        await safe_Send(interaction, "❌ You are not ingame. Please join a server first.")
                         logger.info(f"{interaction.user.name} is not ingame. Cannot execute punish_me command.")
                 else:
-                    await safe_send(interaction, "❌ You are not registered. Please register first.")
+                    await safe_Send(interaction, "❌ You are not registered. Please register first.")
                     logger.info(f"{interaction.user.name} is not registered. Has to register first.")
     
         except Exception as e:

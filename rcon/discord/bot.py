@@ -19,6 +19,7 @@ from rcon.discord.whomikilled import WhomIKilled
 from rcon.discord.switchme import SwitchMe
 from rcon.discord.punishme import PunishMe
 from rcon.discord.removeplayerfromsquad import RemovePlayerFromSquad
+from rcon.discord.vip import VipManagement
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -96,15 +97,19 @@ class MainBot(commands.Bot):
             if (config.get("rcon", 0, "discord_commands", 0, "whom_i_killed", 0, "enabled")):      
                 await self.add_cog(WhomIKilled(self))
 
-            if (config.get("rcon", 0, "discord_commands", 0, "remove_player_from_squad", 0, "enabled")):      
+            if (config.get("rcon", 0, "discord_commands", 0, "remove_player_from_squad", 0, "enabled")):
                 await self.add_cog(RemovePlayerFromSquad(self))
-        
+
+            if (config.get("rcon", 0, "discord_commands", 0, "vip_management", 0, "enabled")):
+                await self.add_cog(VipManagement(self))
+                logger.info(f"VipManagement cog loaded. Commands in tree: {[c.name for c in self.tree.get_commands()]}")
+
         if (config.get("rcon", 0, "inappropriate_name", 0, "enabled")):
             logger.info ("Start inappropriate name")
-            await self.add_cog(Inappropriate(self))  
+            await self.add_cog(Inappropriate(self))
 
-        await self.tree.sync()
-        logger.info ("Slash commands have been synced.")
+        synced = await self.tree.sync()
+        logger.info(f"Slash commands synced globally: {[c.name for c in synced]}")
        
     def run_bot(self):
         self.tree.clear_commands (guild=discord.Object(id=1299285373855203349))

@@ -35,28 +35,15 @@
             "discord_commands": [{
                 "enabled": false,
                 "dryrun": false,
+                "guild_id": 0,
                 "admin_always": false,
                 "groups": [""],
-                "punish_me": [{
-                    "enabled": false,
-                    "groups": [""]
-                }],
-                "switch_me": [{
-                    "enabled": false,
-                    "groups": [""]
-                }],
-                "who_killed_me": [{
-                    "enabled": false,
-                    "groups": [""]
-                }],
-                "whom_i_killed": [{
-                    "enabled": false,
-                    "groups": [""]
-                }],
-                "remove_player_from_squad": [{
-                    "enabled": false,
-                    "groups": [""]
-                }]
+                "punish_me": [{"enabled": false, "groups": [""]}],
+                "switch_me": [{"enabled": false, "groups": [""]}],
+                "who_killed_me": [{"enabled": false, "groups": [""]}],
+                "whom_i_killed": [{"enabled": false, "groups": [""]}],
+                "remove_player_from_squad": [{"enabled": false, "groups": [""]}],
+                "vip_management": [{"enabled": false, "dryrun": false, "allow_gift_from_permanent": false, "groups": [""]}]
             }],
             "map_rotation": [{
                 "enabled": false,
@@ -85,6 +72,13 @@
                 "player_count": 60,
                 "levelbug_enabled": true,
                 "kick_message": "Your level is below {min_level} or you don't own a VIP seat. This server has an adaptive level cap."
+            }],
+            "inappropriate_name": [{
+                "enabled": false,
+                "webhook": "",
+                "threshold": 0.85,
+                "blacklist": [],
+                "whitelist": []
             }],
             "map_vote": [{
                 "enabled": false,

@@ -6,7 +6,7 @@ from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
 from discord import app_commands
 from datetime import datetime
-from rcon.discord.discordutils import safe_send, has_allowed_role
+from rcon.discord.discordutils import safe_Send, has_Allowed_Role
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +26,11 @@ class WhoKilledMe (commands.Cog, DiscordBase):
     async def who_killed_me(self, interaction: discord.Interaction):
         try:
             if not isinstance(interaction.user, discord.Member):
-                await safe_send(interaction, "❌ This command only works on the server.")
+                await safe_Send(interaction, "❌ This command only works on the server.")
                 logger.info(f"{interaction.user} used command outside the server.")
 
-            elif not has_allowed_role(interaction.user, "who_killed_me"):
-                await safe_send(interaction, "❌ You do not have permission for this command.")
+            elif not has_Allowed_Role(interaction.user, "who_killed_me"):
+                await safe_Send(interaction, "❌ You do not have permission for this command.")
                 logger.info(f"{interaction.user} does not have permission to use punish_me command.")
 
             else:
@@ -108,10 +108,10 @@ class WhoKilledMe (commands.Cog, DiscordBase):
                         await interaction.followup.send(embed=stats, ephemeral=True)
 
                     else:
-                        await safe_send(interaction, "❌ You are not ingame. Please join a server first.")
+                        await safe_Send(interaction, "❌ You are not ingame. Please join a server first.")
                         logger.info(f"{interaction.user.name} is not ingame. Cannot execute punish_me command.")
                 else:
-                    await safe_send(interaction, "❌ You are not registered. Please register first.")
+                    await safe_Send(interaction, "❌ You are not registered. Please register first.")
                     logger.info(f"{interaction.user.name} is not registered. Has to register first.")
     
         except Exception as e:

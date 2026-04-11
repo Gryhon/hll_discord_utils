@@ -14,7 +14,7 @@ import rcon.model as model
 import rcon.rcon as rcon
 from lib.config import config
 from rcon.discord.discordbase import DiscordBase
-from rcon.discord.discordutils import has_allowed_role, safe_send
+from rcon.discord.discordutils import has_Allowed_Role, safe_Send
 
 logger = logging.getLogger(__name__)
 
@@ -405,7 +405,7 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
                 error_message = "❌ This command only works on the server."
                 logger.info("%s used command outside the server.", interaction.user)
 
-            if error_message is None and not has_allowed_role(interaction.user, "remove player from squad"):
+            if error_message is None and not has_Allowed_Role(interaction.user, "remove player from squad"):
                 error_message = "❌ You do not have permission for this command."
                 logger.info("%s lacks permission 'remove player from squad'.", interaction.user)
 
@@ -471,7 +471,7 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
                 self._remember_view(final_view, msg)
             else:
                 if not did_defer:
-                    await safe_send(interaction, error_message or "⚠️ Nothing to show.")
+                    await safe_Send(interaction, error_message or "⚠️ Nothing to show.")
                 else:
                     await interaction.edit_original_response(content=error_message or "⚠️ Nothing to show.", embed=None, view=None)
         except Exception:
