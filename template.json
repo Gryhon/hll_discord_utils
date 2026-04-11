@@ -74,13 +74,17 @@
                 "kick_message": "Your level is below {min_level} or you don't own a VIP seat. This server has an adaptive level cap."
             }],
             "inappropriate_name": [{
-                "enabled": false,
-                "webhook": "",
-                "threshold": 0.85,
-                "blacklist": [],
-                "whitelist": [],
-                "blacklist_duration": 0
-            }],
+                    "enabled": false,
+                    "dryrun": false,
+                    "channel_id": 0,
+                    "threshold": 0.85,
+                    "blacklist_id": 0,
+                    "blacklist_duration": 0,
+                    "blacklist_message": "Blacklist Tecxt",
+                    "watch_message": "Watchlist message",
+                    "blacklist": [],
+                    "whitelist": []
+                }],
             "map_vote": [{
                 "enabled": false,
                 "dryrun": false,
