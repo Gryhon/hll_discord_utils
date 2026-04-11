@@ -13,6 +13,78 @@ from discord import app_commands
 logger = logging.getLogger(__name__)
 
 
+class MilCalculatorModal(discord.ui.Modal):
+    def __init__(self, cog, fraction: app_commands.Choice[str], last_elevation: str = ""):
+        super().__init__(title="🎯 Mil Calculator")
+        self.cog = cog
+        self.fraction = fraction
+
+        self.distance_input = discord.ui.TextInput(
+            label="Distance (m)",
+            placeholder="100 – 1600",
+            required=True,
+            max_length=4,
+        )
+        self.elevation_input = discord.ui.TextInput(
+            label="Elevation (mils)",
+            placeholder="0 (optional)",
+            required=False,
+            max_length=5,
+            default=last_elevation,
+        )
+        self.add_item(self.distance_input)
+        self.add_item(self.elevation_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            distance = int(self.distance_input.value.strip())
+            elevation_str = self.elevation_input.value.strip()
+            elevation = int(elevation_str) if elevation_str else 0
+
+            if not (100 <= distance <= 1600):
+                await interaction.response.send_message(
+                    "❌ Distance must be between 100 and 1600 meters.", ephemeral=True
+                )
+                return
+
+            mil_value = await self.cog.calculate(distance, self.fraction.value)
+            if elevation != 0:
+                mil_value = mil_value - elevation
+
+            await self.cog._send_ingame(interaction, distance, self.fraction.value, elevation)
+
+            elev_hint = f" | Elevation: {elevation:+d} mils" if elevation != 0 else ""
+            embed = discord.Embed(
+                title=f"🎯 {self.fraction.name} — {distance} m{elev_hint}",
+                description=f"## {mil_value} mils",
+                color=discord.Color.orange(),
+            )
+
+            view = CalculateAgainView(self.cog, self.fraction, str(elevation) if elevation != 0 else "")
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Invalid input. Please enter valid numbers.", ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error in MilCalculatorModal: {e}")
+            await interaction.response.send_message("❌ An unexpected error occurred.", ephemeral=True)
+
+
+class CalculateAgainView(discord.ui.View):
+    def __init__(self, cog, fraction: app_commands.Choice[str], last_elevation: str = ""):
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.fraction = fraction
+        self.last_elevation = last_elevation
+
+    @discord.ui.button(label="🔄 Calculate again", style=discord.ButtonStyle.primary)
+    async def calculate_again(self, interaction: discord.Interaction, button: discord.ui.Button):
+        modal = MilCalculatorModal(self.cog, self.fraction, self.last_elevation)
+        await interaction.response.send_modal(modal)
+
+
 class ArtilleryCalculator(commands.Cog, DiscordBase):
     def __init__(self, bot):
         super().__init__()
@@ -135,134 +207,10 @@ class ArtilleryCalculator(commands.Cog, DiscordBase):
         else:
             logger.debug(f"Player {player_id} not ingame — no message sent.")
 
-    # --- Session-Flows ---
-
-    async def _run_classic_session(self, interaction: discord.Interaction, thread: discord.Thread,
-                                   fraction: app_commands.Choice[str], check):
-        await thread.send(
-            f"Welcome to your exclusive Mil Calculator, {interaction.user.mention}!\n\n"
-            "The thread will be automatically deleted if you enter `exit` or after 10 minutes of inactivity.\n\n"
-            "Valid input values are between **100** and **1600** meters."
-        )
-
-        while True:
-            try:
-                message = await self.bot.wait_for('message', timeout=600.0, check=check)
-
-                if message.content.lower() == "exit":
-                    await thread.send("Exiting the calculator. See you next time!")
-                    await asyncio.sleep(2)
-                    break
-
-                try:
-                    distance = int(message.content)
-                    if 100 <= distance <= 1600:
-                        mil_value = await self.calculate(distance, fraction.value)
-                        await self._send_ingame(interaction, distance, fraction.value)
-                        await thread.send(f"Calculated Mil at {distance} meters: **{mil_value} Mils**.")
-                    else:
-                        await thread.send("Distance must be between 100 and 1600 meters!")
-                except ValueError:
-                    await thread.send("Invalid input. Please enter a valid number for the distance.")
-
-            except asyncio.TimeoutError:
-                await thread.send("Inactive for 10 minutes. The thread will be closed now.")
-                await asyncio.sleep(5)
-                break
-
-    async def _run_spg_session(self, interaction: discord.Interaction, thread: discord.Thread,
-                               fraction: app_commands.Choice[str], check):
-        current_elevation: int | None = None
-        last_distance: int | None = None
-
-        await thread.send(
-            f"Welcome to your exclusive **SPG Mil Calculator**, {interaction.user.mention}!\n\n"
-            "**Step 1 — Enter the current elevation of your SPG** (in mils, can be negative).\n\n"
-            "Commands:\n"
-            "> `<distance>` — calculate mils for a distance (100–1600 m)\n"
-            "> `elev <value>` — update elevation after moving (e.g. `elev -30`)\n"
-            "> `exit` — close the calculator\n\n"
-            "The thread closes automatically after 10 minutes of inactivity."
-        )
-
-        while True:
-            try:
-                message = await self.bot.wait_for('message', timeout=600.0, check=check)
-                content = message.content.strip()
-
-                if content.lower() == "exit":
-                    await thread.send("Exiting the calculator. See you next time!")
-                    await asyncio.sleep(2)
-                    break
-
-                # Elevation update command
-                if content.lower().startswith("elev"):
-                    parts = content.split()
-                    if len(parts) == 2:
-                        try:
-                            current_elevation = int(parts[1])
-                            response = f"✅ Elevation updated to **{current_elevation:+d} mils**."
-
-                            if last_distance is not None:
-                                raw = await self.calculate(last_distance, fraction.value)
-                                adj = raw - current_elevation
-                                response += (f"\nLast distance **{last_distance} m** recalculated: "
-                                             f"raw {raw} − {current_elevation} = **{adj} mils**.")
-                                await self._send_ingame(interaction, last_distance, fraction.value, current_elevation)
-
-                            await thread.send(response)
-                        except ValueError:
-                            await thread.send("Invalid elevation. Use `elev <number>`, e.g. `elev -30`.")
-                    else:
-                        await thread.send("Use `elev <number>`, e.g. `elev 45`.")
-                    continue
-
-                # First input without elevation set → treat as elevation
-                if current_elevation is None:
-                    try:
-                        current_elevation = int(content)
-                        await thread.send(
-                            f"✅ Elevation set to **{current_elevation:+d} mils**.\n"
-                            "Now enter a target distance (100–1600 m)."
-                        )
-                    except ValueError:
-                        await thread.send(
-                            "Please enter the **elevation in mils** first (e.g. `45` or `-30`)."
-                        )
-                    continue
-
-                # Distance input
-                try:
-                    distance = int(content)
-                    if 100 <= distance <= 1600:
-                        last_distance = distance
-                        raw_mil = await self.calculate(distance, fraction.value)
-                        adj_mil = raw_mil - current_elevation
-
-                        await self._send_ingame(interaction, distance, fraction.value, current_elevation)
-                        await thread.send(
-                            f"Distance: **{distance} m** | Elevation: **{current_elevation:+d} mils**\n"
-                            f"Raw: {raw_mil} − {current_elevation} = **Aim: {adj_mil} mils**"
-                        )
-                    else:
-                        await thread.send("Distance must be between 100 and 1600 meters!")
-                except ValueError:
-                    await thread.send(
-                        "Invalid input. Enter a distance (e.g. `800`) or update elevation (`elev 45`)."
-                    )
-
-            except asyncio.TimeoutError:
-                await thread.send("Inactive for 10 minutes. The thread will be closed now.")
-                await asyncio.sleep(5)
-                break
-
     # --- Slash Command ---
 
     @app_commands.command(name="mil_calculator", description="Calculate mils from distance in meters")
-    @app_commands.describe(
-        fraction="Choose a fraction",
-        gun_type="Artillery type — Classic or Self-Propelled Gun (SPG)",
-    )
+    @app_commands.describe(fraction="Choose a fraction")
     @app_commands.choices(
         fraction=[
             app_commands.Choice(name="Germany", value="DE"),
@@ -270,46 +218,12 @@ class ArtilleryCalculator(commands.Cog, DiscordBase):
             app_commands.Choice(name="USSR",    value="USSR"),
             app_commands.Choice(name="England", value="GB"),
         ],
-        gun_type=[
-            app_commands.Choice(name="Classic Artillery", value="classic"),
-            app_commands.Choice(name="Self-Propelled Gun (SPG)", value="spg"),
-        ],
     )
     async def mil_calculator(self, interaction: discord.Interaction,
-                             fraction: app_commands.Choice[str],
-                             gun_type: app_commands.Choice[str]):
-        logger.info(f"Mil Calculator used by {interaction.user.name} — fraction={fraction.name} type={gun_type.value}")
-
-        if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message(
-                "Threads can only be created in text channels.", ephemeral=True
-            )
-            return
-
-        await interaction.response.send_message(
-            "A private thread has been created for your calculation.\n"
-            "Type `exit` to leave the calculator.",
-            ephemeral=True,
-        )
-
-        thread_name = f"{fraction.name} {'SPG' if gun_type.value == 'spg' else 'Artillery'} — {interaction.user}"
-        private_thread = await interaction.channel.create_thread(
-            name=thread_name,
-            type=discord.ChannelType.private_thread,
-            auto_archive_duration=60,
-        )
-        await private_thread.add_user(interaction.user)
-
-        def check(msg):
-            return msg.author == interaction.user and msg.channel == private_thread
-
-        if gun_type.value == "spg":
-            await self._run_spg_session(interaction, private_thread, fraction, check)
-        else:
-            await self._run_classic_session(interaction, private_thread, fraction, check)
-
-        await private_thread.delete(reason="Thread cleanup")
-        logger.info(f"Closed Mil Calculator for {interaction.user.name}")
+                             fraction: app_commands.Choice[str]):
+        logger.info(f"Mil Calculator used by {interaction.user.name} — fraction={fraction.name}")
+        modal = MilCalculatorModal(self, fraction)
+        await interaction.response.send_modal(modal)
 
     @commands.Cog.listener()
     async def on_ready(self):

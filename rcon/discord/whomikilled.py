@@ -59,52 +59,48 @@ class WhomIKilled (commands.Cog, DiscordBase):
                                    "time_sort": "desc"}
                         log_items = await rcon.get_Historical_Logs (payload)
                 
-                        table = "```"
-                        table += " No |   Killed  \n"
-                        table += "------------------------------------\n"
+                        kills = []
 
-                        no = 0
-                        
                         for i in range(len(log_items.logs)):
-
-                            action = log_items.get_LogItem (i, "type")
-                            myself = log_items.get_LogItem (i, "player1_name")
-                            victim = log_items.get_LogItem (i, "player2_name")
+                            action = log_items.get_LogItem(i, "type")
+                            myself = log_items.get_LogItem(i, "player1_name")
+                            victim = log_items.get_LogItem(i, "player2_name")
 
                             if action == "KILL" and myself == ingame_name:
-                                no = no + 1
+                                weapon = log_items.get_LogItem(i, "weapon")
+                                kills.append((victim, weapon))
 
-                                if len(victim) > 30:
-                                    victim = victim[:27] + "…"
-                                else:
-                                    victim = victim.ljust(27)
-
-                                table += f"{str (no):>3} | {victim}\n"
-
-                            if no >= 7:
+                            if len(kills) >= 7:
                                 break
 
-                        if no == 0:
-                            table += "Mate, try harder, no kills.\n"
+                        color = discord.Color.green() if kills else discord.Color.orange()
 
-                        table += "```"
-                        
-                        stats = discord.Embed(title="Whom I killed?",
-                                              description="\n",
-                                              color=discord.Color.green())
-                        
-                        stats.add_field(name="Kills", value=live_stats.get_PlayerStats (player_id, "kills"), inline=True)
-                        stats.add_field(name="TK", value=live_stats.get_PlayerStats (player_id, "teamkills"), inline=True)
-                        stats.add_field(name="K/D Ratio", value=live_stats.get_PlayerStats (player_id, "kill_death_ratio"), inline=True)
-                        stats.add_field(name="Kills per Min", value=live_stats.get_PlayerStats (player_id, "kills_per_minute"), inline=True)
-                        stats.add_field(name="Kills Streak", value=live_stats.get_PlayerStats (player_id, "kills_streak"), inline=True)
-                            
-                        stats.add_field(name="", value="", inline=False)
-                        stats.add_field(name="", value=table, inline=False) 
+                        stats = discord.Embed(
+                            title="Whom I killed?",
+                            description="💪 Mate, try harder, no kills." if not kills else "",
+                            color=color,
+                        )
 
-                        stats.set_footer(text=f"(Provided by Gryhon)")
-                        stats.timestamp = datetime.now()    
-                        
+                        stats.add_field(name="⚔️ Kills", value=live_stats.get_PlayerStats(player_id, "kills"), inline=False)
+                        stats.add_field(name="🤝 TK", value=live_stats.get_PlayerStats(player_id, "teamkills"), inline=False)
+                        stats.add_field(name="📊 K/D Ratio", value=live_stats.get_PlayerStats(player_id, "kill_death_ratio"), inline=False)
+                        stats.add_field(name="⏱️ Kills/min", value=live_stats.get_PlayerStats(player_id, "kills_per_minute"), inline=False)
+                        stats.add_field(name="🔥 Kill Streak", value=live_stats.get_PlayerStats(player_id, "kills_streak"), inline=False)
+
+                        if kills:
+                            stats.add_field(name="", value="─" * 30, inline=False)
+
+                            for no, (victim, weapon) in enumerate(kills, start=1):
+                                victim_display = (victim[:12] + "…") if len(victim) > 13 else victim
+                                stats.add_field(
+                                    name=f"⚔️ #{no} — {victim_display} ({weapon})",
+                                    value="",
+                                    inline=False,
+                                )
+
+                        stats.set_footer(text="(Provided by Gryhon)")
+                        stats.timestamp = datetime.now()
+
                         await interaction.followup.send(embed=stats, ephemeral=True)           
 
                     else:

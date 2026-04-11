@@ -497,70 +497,45 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
             return []
 
-    async def generate_Table(self, data, map_w=16, name_w=16, header_left="Map", header_right="global_name"):
-        def cut(s, w):
-            t = "" if s is None else str(s)
-            return (t[:max(0, w-1)] + "…") if len(t) > w else t
-        
-        def lpad(s, w): 
-            t = cut(s, w)
-            return " " * (w - len(t)) + t
-        
-        def rpad(s, w): 
-            t = cut(s, w)
-            return t + " " * (w - len(t))
-        
-        def cpad(s, w):
-            t = cut(s, w); total = w - len(t); left = total // 2; right = total - left
-            return " " * left + t + " " * right
-
-        total_w = map_w + 3 + name_w
-        lines = ["```"]
-        lines.append(f"{cpad('Map', map_w)} | {cpad('Player', name_w)}")
-        lines.append("-" * total_w)
-
-        for entry in data:
-            map_name = str(entry[0]) if isinstance(entry, (list, tuple)) and len(entry) >= 1 and entry[0] is not None else ""
-            members = entry[2] if isinstance(entry, (list, tuple)) and len(entry) >= 3 and isinstance(entry[2], list) else []
-
-            players = []
-            i = 0
-            while i < len(members):
-                g = getattr(members[i], "global_name", None)
-                if g: players.append(str(g))
-                i += 1
-
-            if len(players) == 0:
-                lines.append(f"{lpad(map_name, map_w)} | ")
-                lines.append("")
-            else:
-                lines.append(f"{lpad(map_name, map_w)} | {rpad(players[0], name_w)}")
-                j = 1
-                while j < len(players):
-                    lines.append(f"{' ' * map_w} | {rpad(players[j], name_w)}")
-                    j += 1
-                lines.append("")
-
-        lines.append("```")
-        return "\n".join(lines)
-
     async def create_Audit_Log_Message (self):
         try:
             if len (self.webhook_url) >= 0:
                 votes = await self.get_Results ()
-                table = await self.generate_Table (votes)
-            
+
+                medals = ["🥇", "🥈", "🥉"]
+                summary_lines = []
+
+                for idx, entry in enumerate(votes[:3]):
+                    map_name = str(entry[0]) if entry[0] is not None else ""
+                    vote_count = int(entry[1]) if entry[1] is not None else 0
+                    vote_label = "Vote" if vote_count == 1 else "Votes"
+                    summary_lines.append(f"{medals[idx]} **{map_name}** — {vote_count} {vote_label}")
+
                 wt = discord.Embed(
-                    title="Map Vote result by user:",
-                    description="",
+                    title="Map Vote Result",
+                    description="\n".join(summary_lines),
                     color=discord.Color.green(),
                 )
-   
-                wt.add_field(name="", value=table, inline=False) 
-            
-                wt.set_footer(text=f"(Provided by Gryhon)")
+
+                wt.add_field(name="", value="─" * 30, inline=False)
+
+                for entry in votes:
+                    map_name = str(entry[0]) if entry[0] is not None else ""
+                    members = entry[2] if isinstance(entry[2], list) else []
+
+                    players = []
+                    for member in members:
+                        g = getattr(member, "global_name", None)
+                        if g:
+                            players.append(str(g))
+
+                    voter_text = "\n".join(players) if players else "—"
+                    vote_count = int(entry[1]) if entry[1] is not None else 0
+                    wt.add_field(name=f"{map_name} ({vote_count})", value=voter_text, inline=False)
+
+                wt.set_footer(text="(Provided by Gryhon)")
                 wt.timestamp = datetime.now(timezone.utc)
-            
+
                 self.webhook.send(embeds=[wt], wait=True).id
 
         except Exception as e:

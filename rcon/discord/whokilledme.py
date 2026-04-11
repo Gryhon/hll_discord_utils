@@ -59,51 +59,45 @@ class WhoKilledMe (commands.Cog, DiscordBase):
                                    "time_sort": "desc"}
                         log_items = await rcon.get_Historical_Logs (payload)
                         
-                        table = "```"
-                        table += " No |   Killed by   |      Weapon\n"
-                        table += "------------------------------------\n"
+                        deaths = []
 
-                        no = 0
-                        
                         for i in range(len(log_items.logs)):
-
-                            action = log_items.get_LogItem (i, "type")
-                            killer = log_items.get_LogItem (i, "player1_name")
+                            action = log_items.get_LogItem(i, "type")
+                            killer = log_items.get_LogItem(i, "player1_name")
 
                             if action == "KILL" and killer != ingame_name:
-                                no = no + 1
-
-                                if len(killer) > 13:
-                                    killer = killer[:12] + "…"
-                                else:
-                                    killer = killer.ljust(13)
-
                                 weapon = log_items.get_LogItem(i, "weapon")
-                                weapon = (weapon[:12] + "..") if len(weapon) > 14 else weapon
+                                deaths.append((killer, weapon))
 
-                                table += f"{str(no):>3} | {killer} | {weapon:14}\n"
-
-                            if no >= 7:
+                            if len(deaths) >= 7:
                                 break
 
-                        if no == 0:
-                            table += "My hero, you survived!\n"
+                        death_count = live_stats.get_PlayerStats(player_id, "deaths")
+                        color = discord.Color.red() if deaths else discord.Color.green()
 
-                        table += "```"
+                        stats = discord.Embed(
+                            title="Who killed me?",
+                            description="🦸 My hero, you survived!" if not deaths else "",
+                            color=color,
+                        )
 
-                        stats = discord.Embed(title="Who killed me?",
-                                              description="\n")
-                        
-                        stats.add_field(name="Deaths", value=live_stats.get_PlayerStats (player_id, "deaths"), inline=True)
-                        stats.add_field(name="Deaths by TK", value=live_stats.get_PlayerStats (player_id, "deaths_by_tk"), inline=True)
-                        stats.add_field(name="Deaths per Min", value=live_stats.get_PlayerStats (player_id, "deaths_per_minute"), inline=True)
-                        stats.add_field(name="", value="", inline=True)
-                            
-                        stats.add_field(name="", value="", inline=False)
-                        stats.add_field(name="", value=table, inline=False) 
+                        stats.add_field(name="💀 Deaths", value=live_stats.get_PlayerStats(player_id, "deaths"), inline=False)
+                        stats.add_field(name="🤝 Deaths by TK", value=live_stats.get_PlayerStats(player_id, "deaths_by_tk"), inline=False)
+                        stats.add_field(name="⏱️ Deaths/min", value=live_stats.get_PlayerStats(player_id, "deaths_per_minute"), inline=False)
 
-                        stats.set_footer(text=f"(Provided by Gryhon)")
-                        stats.timestamp = datetime.now()    
+                        if deaths:
+                            stats.add_field(name="", value="─" * 30, inline=False)
+
+                            for no, (killer, weapon) in enumerate(deaths, start=1):
+                                killer_display = (killer[:12] + "…") if len(killer) > 13 else killer
+                                stats.add_field(
+                                    name=f"💀 #{no} — {killer_display} ({weapon})",
+                                    value="",
+                                    inline=False,
+                                )
+
+                        stats.set_footer(text="(Provided by Gryhon)")
+                        stats.timestamp = datetime.now()
 
                         await interaction.followup.send(embed=stats, ephemeral=True)
 

@@ -78,7 +78,8 @@
                 "webhook": "",
                 "threshold": 0.85,
                 "blacklist": [],
-                "whitelist": []
+                "whitelist": [],
+                "blacklist_duration": 0
             }],
             "map_vote": [{
                 "enabled": false,

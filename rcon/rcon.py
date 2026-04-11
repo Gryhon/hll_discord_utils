@@ -332,12 +332,10 @@ async def set_Perma_Ban (payload):
     await post_Data ("/api/perma_ban", payload)
 
 async def add_Blacklist_Record (payload):
-    print (payload)
     await post_Data ("/api/add_blacklist_record", payload)
 
-async def remove_Blacklist_Record (payload):
-    print (payload)
-    await post_Data ("/api/delete_blacklist_record", payload)
+async def set_Unban (payload):
+    await post_Data ("/api/unban", payload)
 
 async def remove_from_squad (payload):
     await post_Data ("/api/remove_player_from_squad", payload)

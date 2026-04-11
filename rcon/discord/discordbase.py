@@ -337,8 +337,6 @@ class DiscordBase:
             self.cursor.execute(query, (value, player_id))
             self.conn.commit()
 
-            logger.info (f"Updated {column} to {value} for inanme_player_id {player_id}")
-
         except ValueError as e:
             logger.error(f"ValueError: {e}")
         except sqlite3.OperationalError as e:

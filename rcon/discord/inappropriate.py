@@ -9,11 +9,20 @@ import lib.utils as utils
 from lib.fuzzynamematcher import FuzzyNameMatcher
 from rcon.discord.discordbase import DiscordBase
 from lib.config import config
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
+
+
+def calculate_Expires_At(duration_days: int) -> str | None:
+    if duration_days == 0:
+        return None
+
+    expires = datetime.now(timezone.utc) + timedelta(days=duration_days)
+    expires = expires.replace(hour=23, minute=59, second=59, microsecond=999000)
+    return f"{expires.strftime('%Y-%m-%dT%H:%M:%S')}.{expires.microsecond // 1000:03d}Z"
 
 
 class InappropriateView(discord.ui.View):
@@ -71,13 +80,24 @@ class InappropriateView(discord.ui.View):
 
             if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
                 logger.info(f"Player_id={self.player_id} name='{self.name}' set to WATCH by {interaction.user}")
-                rcon.set_Watch_Player(payload)
+                await rcon.set_Watch_Player(payload)
             else:
                 logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' set to WATCH by {interaction.user}")
 
         elif decision == "ban":
-            logger.info(f"Player_id={self.player_id} name='{self.name}' set to BAN by {interaction.user}")  
-            #TODO: Add API call
+
+            payload = {
+                "player_id": self.player_id,
+                "blacklist_id": config.get("rcon", 0, "inappropriate_name", 0, "blacklist_id", default=None),
+                "reason": config.get("rcon", 0, "inappropriate_name", 0, "blacklist_message", default=None),
+                "expires_at": calculate_Expires_At(config.get("rcon", 0, "inappropriate_name", 0, "blacklist_duration", default=0))
+            }
+
+            if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
+                logger.info(f"Player_id={self.player_id} name='{self.name}' banned by {interaction.user}")
+                await rcon.add_Blacklist_Record(payload)
+            else:
+                logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' banned by {interaction.user}")
 
         self.set_Action_Buttons_Disabled(True)
         self.set_Reopen_Disabled(False)
@@ -116,17 +136,29 @@ class InappropriateView(discord.ui.View):
         previous_decision = result[0][2] if result else None
 
         if previous_decision == "ban":
-            logger.info(f"Reopen: player_id={self.player_id} name='{self.name}' was BANNED — reversing by {interaction.user}")
-            #TODO: Implement API call to reverse the ban
-        
-        elif previous_decision == "watch":            
+
             payload = {
                 "player_id": self.player_id
             }
 
             if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
+                logger.info(f"Reopen: player_id={self.player_id} name='{self.name}' was BANNED — removing from blacklist by {interaction.user}")
+                await rcon.set_Unban(payload)
+            else:
+                logger.info(f"DryRun - Reopen: player_id={self.player_id} name='{self.name}' was BANNED — removing from blacklist by {interaction.user}")
+        
+        elif previous_decision == "watch":         
+
+            payload = {
+                "message": "",
+                "player_id": self.player_id,
+                "player_name": self.name,
+                "reason": ""
+            }
+
+            if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
                 logger.info(f"Reopen: player_id={self.player_id} name='{self.name}' was on WATCH — removing from watchlist by {interaction.user}")
-                rcon.set_Unwatch_Player(payload)
+                await rcon.set_Unwatch_Player(payload)
             else:
                 logger.info(f"DryRun - Reopen: player_id={self.player_id} name='{self.name}' was on WATCH — removing from watchlist by {interaction.user}")
 
