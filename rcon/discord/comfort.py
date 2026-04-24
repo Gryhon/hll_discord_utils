@@ -1,6 +1,7 @@
 import discord
 import logging
 import asyncio
+import random
 import time
 import rcon.model as model
 import rcon.rcon as rcon
@@ -14,36 +15,6 @@ from datetime import datetime, timedelta
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
-
-class SetAfterGameMessage(discord.ui.Modal, title="Configure 'After Game Message' function"):
-    def __init__(self):
-        super().__init__()
-                
-        self.add_item(discord.ui.TextInput(label="Enter your after game message", 
-                                           placeholder="Enter your after game text", 
-                                           default=config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "message", default=""), 
-                                           style=discord.TextStyle.paragraph, 
-                                           required=True))
-                
-        self.result = None
-
-    async def on_submit(self, interaction: discord.Interaction):
-        try:
-            self.result = self.children[0].value
-            logger.info(f"Modal submitted with: {self.result}")
-
-            config.set("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "message", self.result)
-            config.save_Config()
-
-            response_text = f"✅ After game message is saved in config file."
-            
-            await interaction.response.send_message(response_text, ephemeral=True)
-
-            self.result = True
-
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.result = False
 
 class AfterGameMessage (commands.Cog, DiscordBase):
     def __init__(self, bot):
@@ -108,8 +79,9 @@ class AfterGameMessage (commands.Cog, DiscordBase):
 
                 logger.info ("Game ended, sending after game message...")
 
-                after_game_message = config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "message", default="")
-                
+                messages = config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "messages", default=[])
+                after_game_message = random.choice(messages) if messages else ""
+
                 if after_game_message:
                     players = await rcon.get_Players ()
 
@@ -133,24 +105,6 @@ class AfterGameMessage (commands.Cog, DiscordBase):
             
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-
-    @app_commands.command(name="configure_after_game_message", description="Change the after game message")
-    @app_commands.checks.has_permissions(administrator=True)
-    async def configure_after_game_message (self, interaction: discord.Interaction):
-        try:
-            modal = SetAfterGameMessage ()
-            await interaction.response.send_modal(modal)
-            
-            # wait until the modal is closed
-            await modal.wait()
-
-                        # Ergebnis zurückgeben
-            register = modal.result
-            logger.info(f"Modal submitted with after game message: {register}")
-
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            await interaction.response.send_message("An error occurred while trying to unregister the user.",  ephemeral=True)  
 
     @commands.Cog.listener()
     async def on_ready(self):
