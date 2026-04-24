@@ -74,6 +74,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.last_execution = None
         self.send_seeding_message = True
         self.seeded = False
+        self.winning_map = None
 
     async def send_Pause_Message (self, content=None):
         try:
@@ -307,6 +308,8 @@ class VoteMap(commands.Cog, DiscordBase):
             else:
                 logger.error ("Vote result is empty")    
 
+            self.winning_map = vote_result
+
             for map in self.Maps.maps:
                 if map.pretty_name == vote_result:
                     vote = map.id
@@ -511,9 +514,12 @@ class VoteMap(commands.Cog, DiscordBase):
                     vote_label = "Vote" if vote_count == 1 else "Votes"
                     summary_lines.append(f"{medals[idx]} **{map_name}** — {vote_count} {vote_label}")
 
+                winning_label = f"🗺️ **Next map: {self.winning_map}**" if self.winning_map else ""
+                description = (winning_label + "\n\n" + "\n".join(summary_lines)).strip()
+
                 wt = discord.Embed(
                     title="Map Vote Result",
-                    description="\n".join(summary_lines),
+                    description=description,
                     color=discord.Color.green(),
                 )
 

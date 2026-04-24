@@ -33,13 +33,22 @@ class MainBot(commands.Bot):
         self.shutdown_event = asyncio.Event()
 
     async def on_ready(self):
-        logger.info (f'Logged in as {self.user} (ID: {self.user.id})')
+        logger.info(f'Logged in as {self.user} (ID: {self.user.id})')
+
+        guild_id = config.get("rcon", 0, "guild_id", default=0)
+        guilds_to_sync = [discord.Object(id=guild_id)] if guild_id else self.guilds
+        for guild in guilds_to_sync:
+            try:
+                self.tree.copy_global_to(guild=guild)
+                synced = await self.tree.sync(guild=guild)
+                logger.info(f"Slash commands synced to guild {guild.id}: {[c.name for c in synced]}")
+            except discord.HTTPException as e:
+                logger.error(f"Guild sync failed for {guild.id}: {e}")
 
         while not self.shutdown_event.is_set():
-            await asyncio.sleep (5)
+            await asyncio.sleep(5)
     
     async def setup_hook(self):
-
         if (config.get("rcon", 0, "server_status", 0, "enabled")):
             logger.info ("Start server status")
             await self.add_cog(ServerStatus(self)) 
@@ -102,18 +111,12 @@ class MainBot(commands.Bot):
 
             if (config.get("rcon", 0, "discord_commands", 0, "vip_management", 0, "enabled")):
                 await self.add_cog(VipManagement(self))
-                logger.info(f"VipManagement cog loaded. Commands in tree: {[c.name for c in self.tree.get_commands()]}")
 
         if (config.get("rcon", 0, "inappropriate_name", 0, "enabled")):
             logger.info ("Start inappropriate name")
             await self.add_cog(Inappropriate(self))
 
-        synced = await self.tree.sync()
-        logger.info(f"Slash commands synced globally: {[c.name for c in synced]}")
-       
     def run_bot(self):
-        self.tree.clear_commands (guild=discord.Object(id=1299285373855203349))
-        logger.info ("Slash commands have been synced.")
         token = config.get("rcon", 0, "discord_token")
 
         self.run(token)

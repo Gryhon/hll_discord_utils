@@ -27,39 +27,37 @@ class ServerStatus(commands.Cog, DiscordBase):
         current_map, next_map, game_status = await rcon.get_Game_State ()
         server_status = await rcon.get_Server_Status ()
 
-        if current_map:            
+        if current_map:
             stats = discord.Embed(
                 title=server_status.name,
                 description="\n",
                 color=discord.Color.green(),
                 url=config.get("rcon", 0, "stats_url")
                 )
-                            
+
             stats.add_field(name="Current Map", value=current_map.pretty_name, inline=True)
-            stats.add_field(name="Next Map", value=next_map.pretty_name, inline=True) 
+            stats.add_field(name="Next Map", value=next_map.pretty_name, inline=True)
             stats.add_field(name="Time Remaining", value=game_status.raw_time_remaining, inline=True)
             stats.add_field(name="\u200b", value="", inline=False)
             stats.add_field(name="Allies vs Axis", value=str (game_status.num_allied_players) + " - " + str (game_status.num_axis_players), inline=True)
             stats.add_field(name="Match Score", value= str (game_status.allied_score) + " - " + str (game_status.axis_score) , inline=True)
-            stats.add_field(name="Total Player", value=server_status.current_players, inline=True)    
-            stats.set_image (url=f"{config.get("rcon", 0, "stats_url")}/maps/{current_map.image_name}")  
-            
-            stats.set_footer(text=f"(Provided by Gryhon)")
-            stats.timestamp = datetime.now()               
+            stats.add_field(name="Total Player", value=server_status.current_players, inline=True)
+            stats.set_image (url=f"{config.get("rcon", 0, "stats_url")}/maps/{current_map.image_name}")
 
-        if not self.msg_id:
-            self.msg_id = self.webhook.send(embeds=[stats], wait=True).id
-            self.insert_Message_Id(__name__, self.msg_id)  
-        else:
-            try:
-                # Überprüfe, ob die Nachricht noch existiert
-                self.webhook.fetch_message(self.msg_id)
-                # Bearbeite die Nachricht, wenn sie existiert
-                self.webhook.edit_message(message_id=self.msg_id, embeds=[stats])
-            except discord.NotFound:
-                logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
+            stats.set_footer(text=f"(Provided by Gryhon)")
+            stats.timestamp = datetime.now()
+
+            if not self.msg_id:
                 self.msg_id = self.webhook.send(embeds=[stats], wait=True).id
-                self.update_Message_Id (__name__, self.msg_id)
+                self.insert_Message_Id(__name__, self.msg_id)
+            else:
+                try:
+                    self.webhook.fetch_message(self.msg_id)
+                    self.webhook.edit_message(message_id=self.msg_id, embeds=[stats])
+                except discord.NotFound:
+                    logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
+                    self.msg_id = self.webhook.send(embeds=[stats], wait=True).id
+                    self.update_Message_Id (__name__, self.msg_id)
 
     async def background_task(self):
         last_execution = 0
