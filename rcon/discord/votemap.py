@@ -75,6 +75,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.send_seeding_message = True
         self.seeded = False
         self.winning_map = None
+        self.winning_map_is_random = False
 
     async def send_Pause_Message (self, content=None):
         try:
@@ -296,8 +297,10 @@ class VoteMap(commands.Cog, DiscordBase):
 
             if len (candidates) == 1:
                 vote_result = candidates [0][0]
+                self.winning_map_is_random = False
 
             elif len (candidates) > 1:
+                self.winning_map_is_random = True
                 if vote_result and not any(vote_result in sublist for sublist in candidates):
                     i = random.randint(0, len (candidates) - 1)
                     vote_result = candidates [i][0]
@@ -306,7 +309,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     i = random.randint(0, len (candidates) - 1)
                     vote_result = candidates [i][0]
             else:
-                logger.error ("Vote result is empty")    
+                logger.error ("Vote result is empty")
 
             self.winning_map = vote_result
 
@@ -514,7 +517,11 @@ class VoteMap(commands.Cog, DiscordBase):
                     vote_label = "Vote" if vote_count == 1 else "Votes"
                     summary_lines.append(f"{medals[idx]} **{map_name}** — {vote_count} {vote_label}")
 
-                winning_label = f"🗺️ **Next map: {self.winning_map}**" if self.winning_map else ""
+                if self.winning_map:
+                    label_text = "Next random map" if self.winning_map_is_random else "Next map"
+                    winning_label = f"🗺️ **{label_text}: {self.winning_map}**"
+                else:
+                    winning_label = ""
                 description = (winning_label + "\n\n" + "\n".join(summary_lines)).strip()
 
                 wt = discord.Embed(
