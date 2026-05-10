@@ -344,6 +344,18 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
+    def delete_Pending_Without_Message_Id(self):
+        try:
+            self.cursor.execute(
+                "DELETE FROM inappropriate_name WHERE inanme_decision = 'pending' AND (inanme_message_id IS NULL OR inanme_message_id = '')"
+            )
+            deleted = self.cursor.rowcount
+            self.conn.commit()
+            if deleted:
+                logger.info(f"Deleted {deleted} pending inappropriate_name entries without message_id.")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting pending entries without message_id: {e}")
+
     def delete_Inappropriate_Name(self, player_id):
         try:
             self.cursor.execute(
@@ -386,14 +398,14 @@ class DiscordBase:
             return set()
 
     def select_Open_Inappropriate_Names(self):
-        """Alle nicht abgeschlossenen Einträge zurückgeben — für View-Wiederherstellung beim Start.
-        Ausgeschlossen: 'dismissed' (Nachricht gelöscht) und 'whitelist' (endgültig freigegeben)."""
+        """Returns all pending entries for view restoration on bot restart.
+        Only 'pending' entries have an open Discord message that needs a view attached."""
         try:
             self.cursor.execute(
                 '''
                 SELECT inanme_player_id, inanme_name, inname_clan, inanme_message_id, inanme_decision
                 FROM inappropriate_name
-                WHERE inanme_decision NOT IN ('dismissed', 'whitelist')
+                WHERE inanme_decision = 'pending'
                   AND inanme_message_id IS NOT NULL
                   AND inanme_message_id != ''
                 ORDER BY inanme_seqno ASC

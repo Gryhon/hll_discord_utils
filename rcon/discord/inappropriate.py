@@ -31,10 +31,12 @@ class InappropriateView(discord.ui.View):
     The custom_ids of the buttons contain the player_id so that the bot can map incoming
     interactions back to the correct entry after a restart (Persistent View).
     Restore: bot.add_view(InappropriateView(player_id, ...), message_id=int(msg_id))
+
+    Any action decision saves to DB and deletes the Discord message.
+    When the player rejoins the server, a fresh alert is triggered automatically.
     """
 
-    def __init__(self, player_id: str, name: str, clan_tag: str | None, flagged_value: str, cog,
-                 action_taken: bool = False):
+    def __init__(self, player_id: str, name: str, clan_tag: str | None, flagged_value: str, cog):
         super().__init__(timeout=None)
         self.player_id = player_id
         self.name = name
@@ -44,144 +46,115 @@ class InappropriateView(discord.ui.View):
 
         # Stable custom_ids for persistence across bot restarts.
         for item in self.children:
-            item.custom_id = f"inaname_{item.label.lower()}_{player_id}"
+            item.custom_id = f"inaname_{item.label.lower().replace(' ', '_')}_{player_id}"
 
-        # Initial state: Reopen is only active if an action has already been taken
-        # (watch/ban/whitelist). For new alerts (action_taken=False) Reopen is disabled.
-        for item in self.children:
-            if item.row == 0:
-                item.disabled = action_taken      # Action buttons disabled if action already taken
-            elif item.label == "Reopen":
-                item.disabled = not action_taken  # Reopen active only after an action was taken
+    async def finish_Action(self, interaction: discord.Interaction, decision: str):
+        """Execute API action, save decision to DB, and delete the Discord message.
+        When the player rejoins, already_Open returns False and a new alert is sent."""
+        dryrun = config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False)
+        action_taken = True
 
-    def set_Action_Buttons_Disabled(self, disabled: bool):
-        """Enables or disables the action buttons (row 0) without touching the management buttons."""
-        for item in self.children:
-            if item.row == 0:
-                item.disabled = disabled
-
-    def set_Reopen_Disabled(self, disabled: bool):
-        for item in self.children:
-            if item.label == "Reopen":
-                item.disabled = disabled
-
-    async def finish_Action(self, interaction: discord.Interaction, footer: str, color: discord.Color, decision: str):
-        """Disable action buttons, enable Reopen, update embed, and set DB entry."""
-        self.cog.update_Inappropriate_Name(self.player_id, "inanme_decision", decision)
-
-        if decision == "watch":
+        if decision == "kick":
+            players = await rcon.get_In_Game_Players()
+            player_name = players.get_Ingame_Player_Name(self.player_id)
             
+            if player_name == "Not Found":
+                logger.info(f"Kick skipped: player_id={self.player_id} name='{self.name}' is no longer on the server.")
+                await interaction.response.send_message("Player is no longer on the server. Kick skipped.", ephemeral=True)
+                action_taken = False
+            else:
+                payload = {
+                    "player_id": self.player_id,
+                    "reason": config.get("rcon", 0, "inappropriate_name", 0, "kick_message", default="You have been kicked."),
+                    "by": interaction.user.name,
+                    "player_name": self.name
+                }
+                if not dryrun:
+                    logger.info(f"Player_id={self.player_id} name='{self.name}' kicked by {interaction.user}")
+                    await rcon.kick_Player(payload)
+                else:
+                    logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' kicked by {interaction.user}")
+
+        elif decision == "watch":
             payload = {
                 "player_id": self.player_id,
                 "reason": config.get("rcon", 0, "inappropriate_name", 0, "watch_message", default=None),
                 "by": interaction.user.name,
                 "player_name": self.name
             }
-
-            if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
+            if not dryrun:
                 logger.info(f"Player_id={self.player_id} name='{self.name}' set to WATCH by {interaction.user}")
                 await rcon.set_Watch_Player(payload)
             else:
                 logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' set to WATCH by {interaction.user}")
 
-        elif decision == "ban":
-
+        elif decision == "tempban":
             payload = {
                 "player_id": self.player_id,
                 "blacklist_id": config.get("rcon", 0, "inappropriate_name", 0, "blacklist_id", default=None),
-                "reason": config.get("rcon", 0, "inappropriate_name", 0, "blacklist_message", default=None),
-                "expires_at": calculate_Expires_At(config.get("rcon", 0, "inappropriate_name", 0, "blacklist_duration", default=0))
+                "reason": config.get("rcon", 0, "inappropriate_name", 0, "temp_ban_message", default=None),
+                "expires_at": calculate_Expires_At(config.get("rcon", 0, "inappropriate_name", 0, "temp_ban_duration", default=0))
             }
-
-            if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
-                logger.info(f"Player_id={self.player_id} name='{self.name}' banned by {interaction.user}")
+            if not dryrun:
+                logger.info(f"Player_id={self.player_id} name='{self.name}' temp-banned by {interaction.user}")
                 await rcon.add_Blacklist_Record(payload)
             else:
-                logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' banned by {interaction.user}")
+                logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' temp-banned by {interaction.user}")
 
-        self.set_Action_Buttons_Disabled(True)
-        self.set_Reopen_Disabled(False)
-        embed = interaction.message.embeds[0]
-        embed.color = color
-        embed.set_footer(text=footer)
-        await interaction.response.edit_message(embed=embed, view=self)
+        elif decision == "permaban":
+            payload = {
+                "player_id": self.player_id,
+                "reason": config.get("rcon", 0, "inappropriate_name", 0, "perma_ban_message", default=None),
+                "by": interaction.user.name,
+                "player_name": self.name
+            }
+            if not dryrun:
+                logger.info(f"Player_id={self.player_id} name='{self.name}' perma-banned by {interaction.user}")
+                await rcon.set_Perma_Ban(payload)
+            else:
+                logger.info(f"DryRun - Player_id={self.player_id} name='{self.name}' perma-banned by {interaction.user}")
+
+        if action_taken:
+            self.cog.update_Inappropriate_Name(self.player_id, "inanme_decision", decision)
+            await interaction.response.defer()
+            await interaction.message.delete()
 
     # --- Row 0: Action buttons ---
 
-    @discord.ui.button(label="Watch", style=discord.ButtonStyle.secondary, emoji="👁️", row=0)
+    @discord.ui.button(label="Kick", style=discord.ButtonStyle.primary, emoji="🥾", row=0)
+    async def kick(self, interaction: discord.Interaction, button: discord.ui.Button):
+        logger.info(f"Kick requested for player_id={self.player_id} name='{self.name}' by {interaction.user}")
+        await self.finish_Action(interaction, "kick")
+
+    @discord.ui.button(label="Watch", style=discord.ButtonStyle.primary, emoji="👁️", row=0)
     async def watch(self, interaction: discord.Interaction, button: discord.ui.Button):
         logger.info(f"Watch requested for player_id={self.player_id} name='{self.name}' by {interaction.user}")
-        await self.finish_Action(interaction, f"Watching — set by {interaction.user.display_name}",
-                                  discord.Color.yellow(), "watch")
+        await self.finish_Action(interaction, "watch")
 
-    @discord.ui.button(label="Ban", style=discord.ButtonStyle.danger, emoji="🔨", row=0)
-    async def ban(self, interaction: discord.Interaction, button: discord.ui.Button):
-        logger.info(f"Ban requested for player_id={self.player_id} name='{self.name}' by {interaction.user}")
-        await self.finish_Action(interaction, f"Ban requested by {interaction.user.display_name} — execute manually",
-                                  discord.Color.dark_red(), "ban")
+    @discord.ui.button(label="Temp Ban", style=discord.ButtonStyle.danger, emoji="⏱️", row=0)
+    async def temp_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
+        logger.info(f"Temp Ban requested for player_id={self.player_id} name='{self.name}' by {interaction.user}")
+        await self.finish_Action(interaction, "tempban")
 
-    @discord.ui.button(label="Whitelist", style=discord.ButtonStyle.success, emoji="✅", row=0)
-    async def whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
-        logger.info(f"Whitelisted player_id={self.player_id} name='{self.name}' by {interaction.user}")
-        await self.finish_Action(interaction, f"Whitelisted by {interaction.user.display_name}",
-                                  discord.Color.green(), "whitelist")
+    @discord.ui.button(label="Perma Ban", style=discord.ButtonStyle.danger, emoji="🔨", row=1)
+    async def perma_ban(self, interaction: discord.Interaction, button: discord.ui.Button):
+        logger.info(f"Perma Ban requested for player_id={self.player_id} name='{self.name}' by {interaction.user}")
+        await self.finish_Action(interaction, "permaban")
 
     # --- Row 1: Management buttons ---
 
-    @discord.ui.button(label="Reopen", style=discord.ButtonStyle.secondary, emoji="🔄", row=1)
-    async def reopen(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Resets the entry to 'pending', enables action buttons, and disables itself.
-        Reads the previous decision from the DB to reverse any API actions if necessary."""
-        result = self.cog.select_Inappropriate_Name(self.player_id)
-        previous_decision = result[0][2] if result else None
+    @discord.ui.button(label="Whitelist", style=discord.ButtonStyle.success, emoji="✅", row=1)
+    async def whitelist(self, interaction: discord.Interaction, button: discord.ui.Button):
+        logger.info(f"Whitelisted player_id={self.player_id} name='{self.name}' by {interaction.user}")
+        await self.finish_Action(interaction, "whitelist")
 
-        if previous_decision == "ban":
-
-            payload = {
-                "player_id": self.player_id
-            }
-
-            if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
-                logger.info(f"Reopen: player_id={self.player_id} name='{self.name}' was BANNED — removing from blacklist by {interaction.user}")
-                await rcon.set_Unban(payload)
-            else:
-                logger.info(f"DryRun - Reopen: player_id={self.player_id} name='{self.name}' was BANNED — removing from blacklist by {interaction.user}")
-        
-        elif previous_decision == "watch":         
-
-            payload = {
-                "message": "",
-                "player_id": self.player_id,
-                "player_name": self.name,
-                "reason": ""
-            }
-
-            if not config.get("rcon", 0, "inappropriate_name", 0, "dryrun", default=False):
-                logger.info(f"Reopen: player_id={self.player_id} name='{self.name}' was on WATCH — removing from watchlist by {interaction.user}")
-                await rcon.set_Unwatch_Player(payload)
-            else:
-                logger.info(f"DryRun - Reopen: player_id={self.player_id} name='{self.name}' was on WATCH — removing from watchlist by {interaction.user}")
-
-        self.cog.update_Inappropriate_Name(self.player_id, "inanme_decision", "pending")
-        logger.info(f"Reopened player_id={self.player_id} name='{self.name}' (previous='{previous_decision}') by {interaction.user}")
-        self.set_Action_Buttons_Disabled(False)
-        self.set_Reopen_Disabled(True)
-        embed = interaction.message.embeds[0]
-        embed.color = discord.Color.red()
-        embed.set_footer(text="Action required")
-        await interaction.response.edit_message(embed=embed, view=self)
-
-    @discord.ui.button(label="Delete", style=discord.ButtonStyle.danger, emoji="🗑️", row=1)
-    async def delete(self, interaction: discord.Interaction, button: discord.ui.Button):
-        """Deletes the Discord message. Only deletes the DB entry if no action
-        (watch/ban/whitelist) has been taken yet — otherwise the entry is kept."""
-        result = self.cog.select_Inappropriate_Name(self.player_id)
-        decision = result[0][2] if result else None
-        if decision == "pending":
-            self.cog.delete_Inappropriate_Name(self.player_id)
-            logger.info(f"Deleted message and DB entry (was pending) for player_id={self.player_id} name='{self.name}' by {interaction.user}")
-        else:
-            logger.info(f"Deleted message (kept DB entry, decision='{decision}') for player_id={self.player_id} name='{self.name}' by {interaction.user}")
+    @discord.ui.button(label="Dismiss", style=discord.ButtonStyle.success, emoji="🗑️", row=1)
+    async def dismiss(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Deletes the Discord message and the DB entry without taking any moderation action.
+        The player will trigger a new alert on their next server join."""
+        self.cog.delete_Inappropriate_Name(self.player_id)
+        logger.info(f"Dismissed alert for player_id={self.player_id} name='{self.name}' by {interaction.user}")
+        await interaction.response.defer()
         await interaction.message.delete()
 
 
@@ -210,13 +183,13 @@ class Inappropriate(commands.Cog, DiscordBase):
         return decision == "whitelist"
 
     def already_Open(self, player_id: str) -> bool:
-        """True if there is already an open entry for this player in the DB
-        (pending, watch, or ban — i.e. not yet finally decided)."""
+        """True if there is an unacknowledged alert for this player (decision == 'pending').
+        After any action is taken the message is deleted and the player can trigger a new alert on rejoin."""
         result = self.select_Inappropriate_Name(player_id)
         if not result:
             return False
         _, _, decision = result[0]
-        return decision in ("pending", "watch", "ban")
+        return decision == "pending"
 
     async def send_Alert(self, player_id: str, name: str, threshold: float, finding: str,
                           clan_tag: str = None, flagged_value: str = None):
@@ -239,6 +212,7 @@ class Inappropriate(commands.Cog, DiscordBase):
                 embed.add_field(name="Flagged", value=f"`{flagged_value or name}`", inline=True)
                 embed.add_field(name="Matched Term", value=f"`{finding}`", inline=True)
                 embed.add_field(name="Score", value=f"`{threshold:.0%}`", inline=True)
+                embed.add_field(name="Player History", value="*(API integration pending)*", inline=False)
                 embed.set_footer(text="Action required")
 
                 view = InappropriateView(player_id, name, clan_tag, flagged_value or name, self)
@@ -374,13 +348,45 @@ class Inappropriate(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error in check_History_Player: {e}")
 
+    # --- Cleanup ---
+
+    async def cleanup_Stale_Pending(self):
+        """Delete pending DB entries with no msg_id or whose Discord message no longer exists."""
+        self.delete_Pending_Without_Message_Id()
+
+        channel = self.bot.get_channel(int(self._channel_id)) if self._channel_id else None
+        if not channel:
+            return
+
+        open_entries = self.select_Open_Inappropriate_Names()
+        cleaned = 0
+        for player_id, _, _, msg_id, _ in open_entries:
+            try:
+                await channel.fetch_message(int(msg_id))
+            except discord.NotFound:
+                self.delete_Inappropriate_Name(player_id)
+                cleaned += 1
+                logger.info(f"Cleanup: Message {msg_id} not found — deleted DB entry for player_id={player_id}.")
+            except discord.HTTPException:
+                pass
+
+        if cleaned:
+            logger.info(f"Cleanup: {cleaned} stale pending entries deleted.")
+
     # --- Background Task ---
 
     async def background_Task(self):
         last_execution = 0
+        last_cleanup = 0
 
         await self.check_Ingame_Player()
-        #await self.check_History_Player()
+
+        if config.get("rcon", 0, "inappropriate_name", 0, "check_history_once", default=False):
+            logger.info("check_history_once enabled — running full history check.")
+            await self.check_History_Player()
+            config.set("rcon", 0, "inappropriate_name", 0, "check_history_once", False)
+            config.save_Config()
+            logger.info("check_history_once completed — flag set to false in config.json.")
 
         while not self.shutdown_event.is_set():
             current_time = time.time()
@@ -390,44 +396,36 @@ class Inappropriate(commands.Cog, DiscordBase):
                     await self.check_Name()
                 except Exception as e:
                     logger.error(f"Unexpected error in background_Task: {e}")
-
                 last_execution = current_time
+
+            if current_time - last_cleanup >= 600:
+                try:
+                    await self.cleanup_Stale_Pending()
+                except Exception as e:
+                    logger.error(f"Unexpected error in cleanup_Stale_Pending: {e}")
+                last_cleanup = current_time
 
             await asyncio.sleep(5)
 
     async def restore_Views(self):
-        """Re-registers all open views. Messages that no longer exist in Discord
-        are detected and the corresponding DB entries are automatically deleted."""
+        """Re-registers all open views. Calls cleanup_Stale_Pending first to remove
+        entries with no message_id or whose Discord message no longer exists."""
+        await self.cleanup_Stale_Pending()
+
         channel = self.bot.get_channel(int(self._channel_id)) if self._channel_id else None
         open_entries = self.select_Open_Inappropriate_Names()
-        restored = skipped = cleaned = 0
+        restored = skipped = 0
 
-        for player_id, name, clan_tag, msg_id, decision in open_entries:
-            # Check if the Discord message still exists
-            if channel:
-                try:
-                    await channel.fetch_message(int(msg_id))
-                except discord.NotFound:
-                    self.delete_Inappropriate_Name(player_id)
-                    logger.info(f"Restore: Message {msg_id} not found — deleted DB entry for player_id={player_id}.")
-                    cleaned += 1
-                    continue
-                except discord.HTTPException as e:
-                    logger.warning(f"Restore: Message {msg_id} could not be verified ({e}) — skipped.")
-                    skipped += 1
-                    continue
-
+        for player_id, name, clan_tag, msg_id, _ in open_entries:
             try:
-                action_taken = decision != "pending"
-                view = InappropriateView(player_id, name, clan_tag or None, name, self,
-                                         action_taken=action_taken)
+                view = InappropriateView(player_id, name, clan_tag or None, name, self)
                 self.bot.add_view(view, message_id=int(msg_id))
                 restored += 1
             except Exception as e:
                 logger.warning(f"Restore: Could not register view for player_id={player_id} msg_id={msg_id}: {e}")
                 skipped += 1
 
-        logger.info(f"Restore: {restored} restored, {cleaned} orphaned DB entries deleted, {skipped} skipped.")
+        logger.info(f"Restore: {restored} restored, {skipped} skipped.")
 
         # Reverse check: delete bot messages in the channel that have no DB reference
         if channel:
@@ -458,7 +456,7 @@ class Inappropriate(commands.Cog, DiscordBase):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        # await self._purge_Channel()  # <-- uncomment to purge the channel (for testing only!)
+        #await self._purge_Channel()  # <-- uncomment to purge the channel (for testing only!)
         await self.restore_Views()
         if not self.loop_started:
             self.loop_started = True
