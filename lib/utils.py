@@ -109,8 +109,9 @@ class ScheduleManager():
 
     def _normalize(self):
         errors: list[str] = []
-        normalized: list[dict] = []
+        parsed_entries: list[dict] = []
 
+        # First pass: parse all entries
         for idx, entry in enumerate(self.schedule):
             if not isinstance(entry, dict):
                 errors.append(f"Entry {idx}: must be an object/dict")
@@ -129,33 +130,96 @@ class ScheduleManager():
                 errors.append(f"Entry {idx}: invalid day codes {invalid_days}")
 
             on_t = self._parse_time(on_s)
-            off_t = self._parse_time(off_s)
+            off_t = self._parse_time(off_s) if off_s else None
+            has_null_off = off_s is None
 
             if on_t is None:
                 errors.append(f"Entry {idx}: invalid 'on' time {on_s!r} (expect HH:MM)")
-            if off_t is None:
+            if off_s is not None and off_t is None:
                 errors.append(f"Entry {idx}: invalid 'off' time {off_s!r} (expect HH:MM)")
-            if on_t and off_t and on_t == off_t:
-                errors.append(f"Entry {idx}: 'on' equals 'off' ({on_s})")
 
-            if invalid_days or on_t is None or off_t is None:
+            if invalid_days or on_t is None:
                 continue
 
-            # Normale Einträge
-            normalized.append({**entry, "idx": idx, "days": days, "on": on_t, "off": off_t})
+            parsed_entries.append({
+                "idx": idx,
+                "entry": entry,
+                "days": days,
+                "on": on_t,
+                "off": off_t,
+                "has_null_off": has_null_off
+            })
 
-            # split overnight time windows
-            if on_t > off_t:
-                for d in days:
+        # Second pass: sort by on time
+        parsed_entries.sort(key=lambda x: (x["on"].hour * 60 + x["on"].minute))
+
+        # Third pass: resolve off=null per day and build normalized list
+        normalized = []
+
+        for i, pe in enumerate(parsed_entries):
+            on_t = pe["on"]
+            on_min = on_t.hour * 60 + on_t.minute
+
+            if not pe["has_null_off"]:
+                # Explicit off: validate and add directly
+                if pe["on"] == pe["off"]:
+                    errors.append(f"Entry {pe['idx']}: 'on' equals 'off' ({pe['on']})")
+                    continue
+                normalized.append({**pe["entry"], "idx": pe["idx"], "days": pe["days"], "on": pe["on"], "off": pe["off"]})
+                if pe["on"] > pe["off"]:
+                    for d in pe["days"]:
+                        next_day = self.VALID_DAYS[(self.DAY_INDEX[d] + 1) % 7]
+                        normalized.append({**pe["entry"], "idx": pe["idx"], "days": [next_day], "on": datetime.strptime("00:00", "%H:%M").time(), "off": pe["off"], "overnight": True})
+                continue
+
+            # off=null: resolve per day
+            always_on_days = []
+            day_off: dict[str, time] = {}
+
+            for d in pe["days"]:
+                # Other entries that also cover this day
+                others_on_day = [
+                    parsed_entries[j]["on"]
+                    for j in range(len(parsed_entries))
+                    if j != i and d in parsed_entries[j]["days"]
+                ]
+
+                if not others_on_day:
+                    always_on_days.append(d)
+                else:
+                    def dist_after(t: time, base: int = on_min) -> int:
+                        d = (t.hour * 60 + t.minute - base) % 1440
+                        return d if d > 0 else 1440
+                    next_on = min(others_on_day, key=dist_after)
+                    day_off[d] = next_on
+
+            # Add always_on days as a single entry
+            if always_on_days:
+                normalized.append({**pe["entry"], "idx": pe["idx"], "days": always_on_days, "on": on_t, "off": None, "always_on": True})
+
+                # Carry-over to next day if next day has other entries
+                for d in always_on_days:
                     next_day = self.VALID_DAYS[(self.DAY_INDEX[d] + 1) % 7]
-                    normalized.append({
-                        **entry,
-                        "idx": idx,
-                        "days": [next_day],
-                        "on": datetime.strptime("00:00", "%H:%M").time(),
-                        "off": off_t,
-                        "overnight": True
-                    })
+                    others_on_next = [
+                        parsed_entries[j]["on"]
+                        for j in range(len(parsed_entries))
+                        if j != i and next_day in parsed_entries[j]["days"]
+                    ]
+                    if others_on_next:
+                        first_on_next = min(others_on_next, key=lambda t: t.hour * 60 + t.minute)
+                        normalized.append({**pe["entry"], "idx": pe["idx"], "days": [next_day], "on": datetime.strptime("00:00", "%H:%M").time(), "off": first_on_next, "overnight": True})
+
+            # Group days by same off time and add
+            off_groups: dict[time, list[str]] = {}
+            for d, off_t in day_off.items():
+                off_groups.setdefault(off_t, []).append(d)
+
+            for off_t, days_group in off_groups.items():
+                normalized.append({**pe["entry"], "idx": pe["idx"], "days": days_group, "on": on_t, "off": off_t})
+                if on_t > off_t:
+                    for d in days_group:
+                        next_day = self.VALID_DAYS[(self.DAY_INDEX[d] + 1) % 7]
+                        normalized.append({**pe["entry"], "idx": pe["idx"], "days": [next_day], "on": datetime.strptime("00:00", "%H:%M").time(), "off": off_t, "overnight": True})
 
         return normalized, errors
 
@@ -171,6 +235,8 @@ class ScheduleManager():
         per_day: dict[str, list[tuple[int, int, int]]] = {d: [] for d in self.VALID_DAYS}
 
         for item in normalized:
+            if item.get("always_on"):
+                continue
             onm, offm = to_min(item["on"]), to_min(item["off"])
             for d in item["days"]:
                 per_day[d].append((onm, offm, item["idx"]))
@@ -207,6 +273,8 @@ class ScheduleManager():
         for item in normalized:
             if curr_day not in item["days"]:
                 continue
+            if item.get("always_on"):
+                return False
             on_t, off_t = item["on"], item["off"]
 
             if on_t < off_t and on_t <= now_t < off_t:
@@ -226,6 +294,8 @@ class ScheduleManager():
         for item in normalized:
             if curr_day not in item["days"]:
                 continue
+            if item.get("always_on"):
+                return item
             on_t, off_t = item["on"], item["off"]
             if on_t < off_t and on_t <= now_t < off_t:
                 return item
@@ -251,12 +321,20 @@ class ScheduleManager():
         per_day: dict[str, list[tuple[int, int]]] = {d: [] for d in self.VALID_DAYS}
 
         for item in normalized:
-            onm, offm = to_min(item["on"]), to_min(item["off"])
             for d in item["days"]:
-                per_day[d].append((onm, offm))
+                if item.get("always_on"):
+                    per_day[d].append((0, 1440))
+                else:
+                    onm, offm = to_min(item["on"]), to_min(item["off"])
+                    per_day[d].append((onm, 1440 if onm > offm else offm))
 
         timeline: dict[str, list[tuple[str, str, str]]] = {}
         for d, intervals in per_day.items():
+            # always_on overrides everything else
+            if (0, 1440) in intervals:
+                timeline[d] = [("00:00", "24:00", "active")]
+                continue
+
             intervals.sort(key=lambda x: x[0])
             dayline: list[tuple[str, str, str]] = []
 
@@ -264,12 +342,21 @@ class ScheduleManager():
             for start, end in intervals:
                 if prev_end < start:
                     dayline.append((m2s(prev_end), m2s(start), "paused"))
-                dayline.append((m2s(start), m2s(end), "active"))
+                end_str = "24:00" if end == 1440 else m2s(end)
+                dayline.append((m2s(start), end_str, "active"))
                 prev_end = max(prev_end, end)
-            if prev_end < 1440:
+            if prev_end < 1439:
                 dayline.append((m2s(prev_end), "24:00", "paused"))
 
-            timeline[d] = dayline
+            # Merge consecutive segments with same status
+            merged: list[list[str]] = []
+            for seg in dayline:
+                if merged and merged[-1][2] == seg[2] and merged[-1][1] == seg[0]:
+                    merged[-1][1] = seg[1]
+                else:
+                    merged.append(list(seg))
+
+            timeline[d] = [tuple(s) for s in merged]
 
         if with_bars:
             self._print_bars(timeline)

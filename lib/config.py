@@ -6,6 +6,34 @@ from typing import Any, Dict, Union
 # get Logger for this modul
 logger = logging.getLogger(__name__)
 
+
+def _is_simple_value(v: Any) -> bool:
+    """Check if value is a simple scalar (not dict/list)."""
+    return not isinstance(v, (dict, list))
+
+
+def _sort_config_keys(obj: Any) -> Any:
+    """Recursively sort config: simple values first, then complex structures alphabetically."""
+    if isinstance(obj, dict):
+        # Separate simple and complex values
+        simple_items = [(k, v) for k, v in obj.items() if _is_simple_value(v)]
+        complex_items = [(k, v) for k, v in obj.items() if not _is_simple_value(v)]
+
+        # Sort each group: simple by key (unchanged), complex alphabetically
+        simple_items.sort(key=lambda x: x[0])  # Preserve order for simple values
+        complex_items.sort(key=lambda x: x[0])  # Alphabetical for complex
+
+        # Merge: simple first, then complex
+        sorted_dict = {}
+        for k, v in simple_items + complex_items:
+            sorted_dict[k] = _sort_config_keys(v)
+
+        return sorted_dict
+    elif isinstance(obj, list):
+        return [_sort_config_keys(item) for item in obj]
+    else:
+        return obj
+
 class config:
     _config_data: Dict[str, Any] = {}
 
@@ -18,8 +46,9 @@ class config:
 
     @classmethod
     def save_Config(cls, filename: str = "config.json",):
+        sorted_data = _sort_config_keys(cls._config_data)
         with open(filename, 'w') as file:
-            json.dump(cls._config_data, file, indent=4)
+            json.dump(sorted_data, file, indent=4)
 
     @classmethod
     def get(cls, *keys: Union[str, int], default: Any = None) -> Any:

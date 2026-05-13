@@ -14,7 +14,11 @@ from discord.ext import commands
 from discord import app_commands
 from lib.config import config
 from datetime import timedelta, datetime, timezone
+from pathlib import Path
 
+_TIGER_TANK       = Path(__file__).resolve().parent.parent.parent / "Assets" / "Tiger_Tank.png"
+_TIGER_TANK_PAUSE = Path(__file__).resolve().parent.parent.parent / "Assets" / "Tiger_Tank_pause.png"
+_TIGER_TANK_ADMIN = Path(__file__).resolve().parent.parent.parent / "Assets" / "Tiger_Tank_admin.png"
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -33,21 +37,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.vote_map_active = True
         self.reset_Vote_Variables() # Reset all variables to default values
         self.shutdown_event = asyncio.Event()
-        self.seeding_message = ("\nImportant:\n\n"
-                                "    Vote function available when\n"
-                                "        there are more than\n\n"
-                               f"          ** {config.get("rcon", 0, "map_vote", 0, "activate_vote")} Player **\n\n"
-                                "          on the server!\n\n")
-        self.pause_message = ("\n\n"
-                            "       Vote function is paused!\n\n"
-                            "   We will inform you in the channel\n"
-                            "  when the function is enabled again.\n\n"
-                            "             Stay tuned!\n\n")
-        self.scheduler_message = ("\n\n"
-                            "       Vote function is paused!\n\n"
-                            "     paused per schedule between\n"
-                            "        ** {off} and {on} **\n\n"
-                            "             Stay tuned!\n\n")
+        self.activate_vote = config.get("rcon", 0, "map_vote", 0, "activate_vote")
         self.vote_channel_id = config.get("rcon", 0, "map_vote", 0, "vote_channel_id") 
         self.vote_channel = None   
         self.loop_started = False
@@ -77,17 +67,48 @@ class VoteMap(commands.Cog, DiscordBase):
         self.winning_map = None
         self.winning_map_is_random = False
 
-    async def send_Pause_Message (self, content=None):
-        try:
-            if content is None:
-                content = self.pause_message
+    def _time_to_discord_ts(self, time_str: str, must_be_future: bool = False) -> int:
+        now = datetime.now()
+        if time_str == "24:00":
+            dt = datetime(now.year, now.month, now.day) + timedelta(days=1)
+        else:
+            h, m = map(int, time_str.split(':'))
+            dt = datetime(now.year, now.month, now.day, h, m)
+        if must_be_future and dt <= now:
+            dt += timedelta(days=1)
+        return int(dt.timestamp())
 
-            message = (
-                f"""
-                    ```  {content} ```
-                """
-            )
-            self.seeding_msg = await self.vote_channel.send(message)
+    async def send_Pause_Message (self, off_ts: int = None, on_ts: int = None, user: discord.User = None):
+        try:
+            if off_ts and on_ts:
+                embed = discord.Embed(
+                    title="⏸️  Map Vote — Paused",
+                    description=(
+                        "The map vote is **temporarily paused** per schedule. "
+                        "It will resume automatically — stay tuned!\n"
+                    ),
+                    color=discord.Color.orange(),
+                    timestamp=datetime.now(timezone.utc),
+                )
+                embed.add_field(name="▶️  Resumes at", value=f"<t:{on_ts}:t>\n<t:{on_ts}:R>", inline=True)
+                file = discord.File(_TIGER_TANK_PAUSE, filename="Tiger_Tank_pause.png")
+                embed.set_image(url="attachment://Tiger_Tank_pause.png")
+            else:
+                embed = discord.Embed(
+                    title="🛑  Map Vote — Paused by Admin",
+                    description=(
+                        "An administrator has **paused** the map vote. "
+                        "You will be notified in this channel once it's active again."
+                    ),
+                    color=discord.Color.red(),
+                    timestamp=datetime.now(timezone.utc),
+                )
+                file = discord.File(_TIGER_TANK_ADMIN, filename="Tiger_Tank_admin.png")
+                embed.set_image(url="attachment://Tiger_Tank_admin.png")
+            
+            embed.set_footer(text="(Provided by Gryhon)")
+            
+            self.seeding_msg = await self.vote_channel.send(embed=embed, file=file)
             logger.info ("Server is paused message ID: " + str (self.seeding_msg.id))
 
         except discord.HTTPException as e:
@@ -97,12 +118,19 @@ class VoteMap(commands.Cog, DiscordBase):
 
     async def send_Seeding_Message (self):
         try:
-            message = (
-                f"""
-                    ```  {self.seeding_message} ```
-                """
+            embed = discord.Embed(
+                title="🗺️  Map Vote",
+                description=(
+                    f"The vote activates once **{self.activate_vote}+ players** are online. "
+                    "Cast your vote and help decide the next map!"
+                ),
+                color=discord.Color.from_rgb(88, 101, 242),
+                timestamp=datetime.now(timezone.utc),
             )
-            self.seeding_msg = await self.vote_channel.send(message)
+            embed.set_image(url="attachment://Tiger_Tank.png")
+            embed.set_footer(text="(Provided by Gryhon)")
+            file = discord.File(_TIGER_TANK, filename="Tiger_Tank.png")
+            self.seeding_msg = await self.vote_channel.send(embed=embed, file=file)
             logger.info ("Server is seeding message ID: " + str (self.seeding_msg.id))
 
         except discord.HTTPException as e:
@@ -118,12 +146,10 @@ class VoteMap(commands.Cog, DiscordBase):
 
             elif history:
 
-                async for msg in self.vote_channel.history(limit=100):  
-                    if msg.author == self.bot.user:
-                        if self.seeding_message in msg.content:
-                            logger.info ("Delete old Message ID: " + str (msg.id))
-                            await msg.delete()
-                            
+                async for msg in self.vote_channel.history(limit=100):
+                    if msg.author == self.bot.user and msg.embeds and not msg.poll and not msg.interaction_metadata:
+                        logger.info ("Delete old Message ID: " + str (msg.id))
+                        await msg.delete()
                         await asyncio.sleep(1)
 
         except discord.HTTPException as e:
@@ -666,7 +692,6 @@ class VoteMap(commands.Cog, DiscordBase):
     
     async def save_Origin_Map_Rotation (self):
         try:
-            logger.info (f"Saveing origin map rotation")
             map_rotation = await rcon.get_Map_Rotation ()
 
             if len(map_rotation.maps) > 1 or (len(map_rotation.maps) == 1 and (not self.seeded or not self.do_map_vote)):
@@ -675,6 +700,7 @@ class VoteMap(commands.Cog, DiscordBase):
                 rotation = self.select_Key_Value ("Origin_Map_Rotation")
 
                 if rotation == None:
+                    logger.info ("Saveing origin map rotation")
                     self.insert_Key_Value ("Origin_Map_Rotation", maps)
                     logger.info ("Insert origin map rotation")
                 else:
@@ -682,6 +708,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     set2 = set(rotation.split("|"))
 
                     if set1 != set2:
+                        logger.info ("Saveing origin map rotation")
                         self.update_Key_Value ("Origin_Map_Rotation", maps)
                         logger.info ("Update origin map rotation")            
 
@@ -856,10 +883,13 @@ class VoteMap(commands.Cog, DiscordBase):
                         await self.stop_Vote ()
                         await self.restore_Origin_Map_Rotation ()
 
-                    await self.clear_All_Messages (None, False)                
+                    await self.clear_All_Messages (None, False)
                     window = self.scheduler_messager.get_current_window_times ()
-                    
-                    await self.send_Pause_Message (self.scheduler_message.format(off=window[0], on=window[1]))
+
+                    off_ts = self._time_to_discord_ts(window[0])
+                    on_ts  = self._time_to_discord_ts(window[1], must_be_future=True)
+
+                    await self.send_Pause_Message (off_ts=off_ts, on_ts=on_ts)
 
                     self.reset_Vote_Variables()
 

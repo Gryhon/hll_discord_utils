@@ -4,14 +4,22 @@ import signal
 import sys
 import threading
 from lib.config import config
-from lib.configupdater import ConfigUpdater
+from lib.migration import run_migrations
 from lib.logging import setup_logger
 from rcon.discord.bot import start_bot, shutdown_bot
 
 config_name = "config.json"
-template_name = "template.json"
 
-config.load_Config (config_name)
+setup_logger()
+
+config.load_Config(config_name)
+old_version = config._config_data.get("config_version", 1)
+migrated = run_migrations(config._config_data, config_name)
+if migrated.get("config_version", 1) > old_version:
+    config.save_Config(config_name)
+    config.load_Config(config_name, reload=True)
+
+setup_logger(config.get("rcon", 0, "log_level"))
 
 class GracefulKiller:
     kill_now = False
@@ -22,23 +30,9 @@ class GracefulKiller:
     def exit_gracefully(self, *args):
         self.kill_now = True
 
-async def update_Config ():
-
-    config_updater = ConfigUpdater(template_name, config_name)
-    config_updater.update()
-
-    if config_updater.updated_config:
-        config_updater.save_Config(config_name)
-        config.load_Config (config_name, True)
-
 async def main():
-    
-    setup_logger(config.get("rcon", 0, "log_level"))
-    
-    logger = logging.getLogger(__name__)
 
-    #await update_Config ()
-    logger.warning(f"Note to myself: Update Config is disabled for now.")
+    logger = logging.getLogger(__name__)
 
     killer = GracefulKiller()
     logger.info("Program started. Press Ctrl+C to exit the program.")
