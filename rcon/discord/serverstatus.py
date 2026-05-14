@@ -3,8 +3,9 @@ import logging
 import asyncio
 import pytz
 import time
+from functools import partial
 import rcon.rcon as rcon
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from lib.config import config
 from datetime import datetime
 from discord.ext import commands
@@ -17,7 +18,7 @@ class ServerStatus(commands.Cog, DiscordBase):
     def __init__(self, bot):
         super().__init__()
         self.webhook_url = config.get("rcon", 0, "server_status", 0, "webhook")
-        self.webhook = discord.AsyncWebhook.from_url(self.webhook_url)
+        self.webhook = discord.SyncWebhook.from_url(self.webhook_url)
         self.msg_id = self.select_Message_Id (__name__)
         self.shutdown_event = asyncio.Event()
         self.bot = bot 
@@ -47,17 +48,18 @@ class ServerStatus(commands.Cog, DiscordBase):
             stats.set_footer(text=f"(Provided by Gryhon)")
             stats.timestamp = datetime.now()
 
+            loop = asyncio.get_event_loop()
             if not self.msg_id:
-                msg = await self.webhook.send(embeds=[stats], wait=True)
+                msg = await loop.run_in_executor(None, partial(self.webhook.send, embeds=[stats], wait=True))
                 self.msg_id = msg.id
                 self.insert_Message_Id(__name__, self.msg_id)
             else:
                 try:
-                    await self.webhook.fetch_message(self.msg_id)
-                    await self.webhook.edit_message(message_id=self.msg_id, embeds=[stats])
+                    await loop.run_in_executor(None, partial(self.webhook.fetch_message, self.msg_id))
+                    await loop.run_in_executor(None, partial(self.webhook.edit_message, message_id=self.msg_id, embeds=[stats]))
                 except discord.NotFound:
                     logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
-                    msg = await self.webhook.send(embeds=[stats], wait=True)
+                    msg = await loop.run_in_executor(None, partial(self.webhook.send, embeds=[stats], wait=True))
                     self.msg_id = msg.id
                     self.update_Message_Id (__name__, self.msg_id)
 
