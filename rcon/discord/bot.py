@@ -45,10 +45,6 @@ class MainBot(commands.Bot):
             except discord.HTTPException as e:
                 logger.error(f"Guild sync failed for {guild.id}: {e}")
 
-        self.tree.clear_commands(guild=None)
-        await self.tree.sync()
-        logger.info("Global slash commands cleared.")
-
         while not self.shutdown_event.is_set():
             await asyncio.sleep(5)
     
