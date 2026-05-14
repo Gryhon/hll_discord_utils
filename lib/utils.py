@@ -406,11 +406,12 @@ class ScheduleManager():
             if prev_off <= now_t < on_t:
                 return prev_off.strftime("%H:%M"), on_t.strftime("%H:%M")
 
-        # If after the last slot → paused until midnight
+        # If after the last slot → paused until the first slot next day
         if slots:
             last_off = slots[-1]["off"]
             if now_t >= last_off:
-                return last_off.strftime("%H:%M"), "24:00"
+                first_on = slots[0]["on"]
+                return last_off.strftime("%H:%M"), first_on.strftime("%H:%M")
 
         return None
 
