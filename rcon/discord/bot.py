@@ -35,10 +35,6 @@ class MainBot(commands.Bot):
     async def on_ready(self):
         logger.info(f'Logged in as {self.user} (ID: {self.user.id})')
 
-        self.tree.clear_commands(guild=None)
-        await self.tree.sync()
-        logger.info("Global slash commands cleared.")
-
         guild_id = config.get("rcon", 0, "guild_id", default=0)
         guilds_to_sync = [discord.Object(id=guild_id)] if guild_id else self.guilds
         for guild in guilds_to_sync:
@@ -48,6 +44,10 @@ class MainBot(commands.Bot):
                 logger.info(f"Slash commands synced to guild {guild.id}: {[c.name for c in synced]}")
             except discord.HTTPException as e:
                 logger.error(f"Guild sync failed for {guild.id}: {e}")
+
+        self.tree.clear_commands(guild=None)
+        await self.tree.sync()
+        logger.info("Global slash commands cleared.")
 
         while not self.shutdown_event.is_set():
             await asyncio.sleep(5)
