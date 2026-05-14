@@ -17,7 +17,7 @@ class ServerStatus(commands.Cog, DiscordBase):
     def __init__(self, bot):
         super().__init__()
         self.webhook_url = config.get("rcon", 0, "server_status", 0, "webhook")
-        self.webhook = discord.SyncWebhook.from_url(self.webhook_url)
+        self.webhook = discord.AsyncWebhook.from_url(self.webhook_url)
         self.msg_id = self.select_Message_Id (__name__)
         self.shutdown_event = asyncio.Event()
         self.bot = bot 
@@ -48,15 +48,17 @@ class ServerStatus(commands.Cog, DiscordBase):
             stats.timestamp = datetime.now()
 
             if not self.msg_id:
-                self.msg_id = self.webhook.send(embeds=[stats], wait=True).id
+                msg = await self.webhook.send(embeds=[stats], wait=True)
+                self.msg_id = msg.id
                 self.insert_Message_Id(__name__, self.msg_id)
             else:
                 try:
-                    self.webhook.fetch_message(self.msg_id)
-                    self.webhook.edit_message(message_id=self.msg_id, embeds=[stats])
+                    await self.webhook.fetch_message(self.msg_id)
+                    await self.webhook.edit_message(message_id=self.msg_id, embeds=[stats])
                 except discord.NotFound:
                     logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
-                    self.msg_id = self.webhook.send(embeds=[stats], wait=True).id
+                    msg = await self.webhook.send(embeds=[stats], wait=True)
+                    self.msg_id = msg.id
                     self.update_Message_Id (__name__, self.msg_id)
 
     async def background_task(self):
