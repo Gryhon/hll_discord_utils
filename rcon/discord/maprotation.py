@@ -2,8 +2,9 @@ import discord
 import logging
 import asyncio
 import time
+from functools import partial
 import rcon.rcon as rcon
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from lib.config import config
 from datetime import datetime
 from discord.ext import commands
@@ -27,37 +28,38 @@ class MapRotation (commands.Cog, DiscordBase):
         server_status = await rcon.get_Server_Status ()
 
         if map_rotation and server_status:
-                        
+
             description = "**Map rotation:**\n"
-    
+
             for map in map_rotation.maps:
                 description += f"- {map.pretty_name}\n"
-            
+
             maps = discord.Embed(
                 title=server_status.name,
                 description=description + "\n",
                 color=discord.Color.blue(),
                 url=config.get("rcon", 0, "stats_url")
-                )                           
-                        
-            maps.set_image (url=f"{config.get("rcon", 0, "stats_url")}/maps/unknown.webp")  
+                )
+
+            maps.set_image (url=f"{config.get("rcon", 0, "stats_url")}/maps/unknown.webp")
             maps.set_footer(text=f"(Provided by Gryhon)")
             maps.timestamp = datetime.now()
 
-        if not self.msg_id:
-            self.msg_id = self.webhook.send(embeds=[maps], wait=True).id
-            self.insert_Message_Id(__name__, self.msg_id)  
-        else:
-            try:
-                # Check whether the message still exists
-                self.webhook.fetch_message(self.msg_id)
-                # Edit the message if it exists
-                self.webhook.edit_message(message_id=self.msg_id, embeds=[maps])
+            loop = asyncio.get_event_loop()
+            if not self.msg_id:
+                msg = await loop.run_in_executor(None, partial(self.webhook.send, embeds=[maps], wait=True))
+                self.msg_id = msg.id
+                self.insert_Message_Id(__name__, self.msg_id)
+            else:
+                try:
+                    await loop.run_in_executor(None, partial(self.webhook.fetch_message, self.msg_id))
+                    await loop.run_in_executor(None, partial(self.webhook.edit_message, message_id=self.msg_id, embeds=[maps]))
 
-            except discord.NotFound:
-                logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
-                self.msg_id = self.webhook.send(embeds=[maps], wait=True).id
-                self.update_Message_Id (__name__, self.msg_id)
+                except discord.NotFound:
+                    logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
+                    msg = await loop.run_in_executor(None, partial(self.webhook.send, embeds=[maps], wait=True))
+                    self.msg_id = msg.id
+                    self.update_Message_Id (__name__, self.msg_id)
 
     async def background_task(self):
         last_execution = 0

@@ -3,13 +3,14 @@ import logging
 import asyncio
 import random
 import time
+from functools import partial
 import lib.utils as utils
 import rcon.model as model
 import rcon.rcon as rcon
 from enum import Enum
 from typing import List
 from dateutil.parser import parse
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
 from discord import app_commands
 from lib.config import config
@@ -575,7 +576,8 @@ class VoteMap(commands.Cog, DiscordBase):
                 wt.set_footer(text="(Provided by Gryhon)")
                 wt.timestamp = datetime.now(timezone.utc)
 
-                self.webhook.send(embeds=[wt], wait=True).id
+                loop = asyncio.get_event_loop()
+                await loop.run_in_executor(None, partial(self.webhook.send, embeds=[wt], wait=True))
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")

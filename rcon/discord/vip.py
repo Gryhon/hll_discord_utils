@@ -243,7 +243,7 @@ class VipManagement(commands.Cog, DiscordBase):
             base = max(now, recipient_expiry) if recipient_expiry else now
             new_recipient_expiry = base + timedelta(days=1)
 
-            dryrun = config.get("rcon", 0, "discord_commands", 0, "vip_management", 0, "dryrun", default=False)
+            dryrun = config.get("rcon", 0, "discord_commands", 0, "dryrun", default=False)
 
             donor_vip_after = "permanent" if donor_permanent else new_donor_expiry.strftime("%Y-%m-%d")
             embed = discord.Embed(

@@ -1,6 +1,7 @@
 import aiohttp
 import json
 import logging
+import asyncio
 from lib.jsonxpath import JSONXPath
 import jmespath
 import jsonpath_ng.ext as jpath
@@ -10,85 +11,121 @@ from datetime import datetime, time
 # get Logger for this modul
 logger = logging.getLogger(__name__)
 
-async def get_Data_from_Url(url, token, payload=None):
+async def get_Data_from_Url(url, token, payload=None, retries=3, backoff_delays=(0, 1, 2)):
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
+
+    retryable_errors = (
+        aiohttp.ClientConnectionError,
+        aiohttp.ClientError,
+        asyncio.TimeoutError,
+    )
+
+    for attempt in range(retries):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers=headers, params=payload, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    elif response.status in (500, 502, 503, 504):
+                        if attempt < retries - 1:
+                            wait = backoff_delays[attempt]
+                            logger.warning(f"API error {response.status}, retry in {wait}s")
+                            await asyncio.sleep(wait)
+                            continue
+                        else:
+                            logger.error(f"Error: {response.status}")
+                            logger.info(f"Details: {await response.text()}")
+                            return None
+                    else:
+                        logger.error(f"Error: {response.status}")
+                        logger.info(f"Details: {await response.text()}")
+                        return None
+
+        except retryable_errors as error:
+            if attempt < retries - 1:
+                wait = backoff_delays[attempt]
+                logger.warning(f"Connection error, retry in {wait}s: {error}")
+                await asyncio.sleep(wait)
+            else:
+                logger.error(f"Connection error after {retries} attempts: {error}")
+                return None
     
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers, params=payload) as response:
-                # Check whether the request was successful
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    logger.error(f"Error: {response.status}")
-                    logger.info(f"Details: {await response.text()}")
-                    return None
-                
-    except aiohttp.ClientConnectionError as error:
-        logger.error(f"Connection error: {error}")
-        return None
-    
-async def post_data_to_Url(url, token, payload):
+async def post_data_to_Url(url, token, payload, retries=3, backoff_delays=(0, 1, 2)):
     header = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
     }
 
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(url, json = payload, headers=header) as response:
-                # Check whether the request was successful
-                if response.status == 200:
-                    return await response.json()
-                else:
-                    logger.error(f"Error: {response.status}")
-                    logger.info(f"Details: {await response.text()}")
-                    return []
-                
-    except aiohttp.ClientConnectionError as error:
-        logger.error(f"Connection error: {error}")
-        return None
+    retryable_errors = (
+        aiohttp.ClientConnectionError,
+        aiohttp.ClientError,
+        asyncio.TimeoutError,
+    )
 
-async def get_Data (api_url, payload=None):
-     # Read URL and token from environment variables
+    for attempt in range(retries):
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, json=payload, headers=header, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    elif response.status in (500, 502, 503, 504):
+                        if attempt < retries - 1:
+                            wait = backoff_delays[attempt]
+                            logger.warning(f"API error {response.status}, retry in {wait}s")
+                            await asyncio.sleep(wait)
+                            continue
+                        else:
+                            logger.error(f"Error: {response.status}")
+                            logger.info(f"Details: {await response.text()}")
+                            return []
+                    else:
+                        logger.error(f"Error: {response.status}")
+                        logger.info(f"Details: {await response.text()}")
+                        return []
+
+        except retryable_errors as error:
+            if attempt < retries - 1:
+                wait = backoff_delays[attempt]
+                logger.warning(f"Connection error, retry in {wait}s: {error}")
+                await asyncio.sleep(wait)
+            else:
+                logger.error(f"Connection error after {retries} attempts: {error}")
+                return None
+
+async def get_Data(api_url, payload=None, retries=3, backoff_delays=(0, 1, 2)):
     base_url = config.get("rcon", 0, "api_url")
     bearer_token = config.get("rcon", 0, "bearer_token")
 
     if not base_url:
         logger.error("API_URL environment variable is not set")
         return {'error': 'API_URL not set'}
-    
+
     if not bearer_token:
         logger.error("BEARER_TOKEN environment variable is not set")
         return {'error': 'BEARER_TOKEN not set'}
 
-    # Retrieve API data
     full_url = base_url + api_url
-    data = await get_Data_from_Url(full_url, bearer_token, payload)
+    data = await get_Data_from_Url(full_url, bearer_token, payload, retries, backoff_delays)
 
     return data
 
-async def post_Data(api_url, payload):
-    # Read URL and token from environment variables
+async def post_Data(api_url, payload, retries=3, backoff_delays=(0, 1, 2)):
     base_url = config.get("rcon", 0, "api_url")
     bearer_token = config.get("rcon", 0, "bearer_token")
 
     if not base_url:
         logger.error("API_URL environment variable is not set")
         return {'error': 'API_URL not set'}
-    
+
     if not bearer_token:
         logger.error("BEARER_TOKEN environment variable is not set")
         return {'error': 'BEARER_TOKEN not set'}
 
-    # Create full URL for the API endpoint
     full_url = base_url + api_url
-
-    # Sending the data
-    response = await post_data_to_Url(full_url, bearer_token, payload)
+    response = await post_data_to_Url(full_url, bearer_token, payload, retries, backoff_delays)
 
     return response
 
