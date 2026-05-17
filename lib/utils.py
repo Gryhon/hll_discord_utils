@@ -11,7 +11,7 @@ from datetime import datetime, time
 # get Logger for this modul
 logger = logging.getLogger(__name__)
 
-async def get_Data_from_Url(url, token, payload=None, retries=3, backoff_delays=(0, 1, 2)):
+async def get_Data_from_Url(url, token, payload=None, retries=3, backoff_delays=(1, 2, 3)):
     headers = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
@@ -32,7 +32,7 @@ async def get_Data_from_Url(url, token, payload=None, retries=3, backoff_delays=
                     elif response.status in (500, 502, 503, 504):
                         if attempt < retries - 1:
                             wait = backoff_delays[attempt]
-                            logger.warning(f"API error {response.status}, retry in {wait}s")
+                            logger.warning(f"Don't panic, API error {response.status} on {url}, retry in {wait}s")
                             await asyncio.sleep(wait)
                             continue
                         else:
@@ -47,13 +47,14 @@ async def get_Data_from_Url(url, token, payload=None, retries=3, backoff_delays=
         except retryable_errors as error:
             if attempt < retries - 1:
                 wait = backoff_delays[attempt]
-                logger.warning(f"Connection error, retry in {wait}s: {error}")
+                logger.warning(f"Don't panic, connection error on {url}, retry in {wait}s: {error}")
                 await asyncio.sleep(wait)
             else:
-                logger.error(f"Connection error after {retries} attempts: {error}")
+                logger.error(f"Connection error on {url} after {retries} attempts: {error}")
                 return None
-    
-async def post_data_to_Url(url, token, payload, retries=3, backoff_delays=(0, 1, 2)):
+
+
+async def post_data_to_Url(url, token, payload, retries=3, backoff_delays=(1, 2, 3)):
     header = {
         'Authorization': f'Bearer {token}',
         'Content-Type': 'application/json'
@@ -74,7 +75,7 @@ async def post_data_to_Url(url, token, payload, retries=3, backoff_delays=(0, 1,
                     elif response.status in (500, 502, 503, 504):
                         if attempt < retries - 1:
                             wait = backoff_delays[attempt]
-                            logger.warning(f"API error {response.status}, retry in {wait}s")
+                            logger.warning(f"API error {response.status} on {url}, retry in {wait}s")
                             await asyncio.sleep(wait)
                             continue
                         else:
@@ -89,10 +90,10 @@ async def post_data_to_Url(url, token, payload, retries=3, backoff_delays=(0, 1,
         except retryable_errors as error:
             if attempt < retries - 1:
                 wait = backoff_delays[attempt]
-                logger.warning(f"Connection error, retry in {wait}s: {error}")
+                logger.warning(f"Connection error on {url}, retry in {wait}s: {error}")
                 await asyncio.sleep(wait)
             else:
-                logger.error(f"Connection error after {retries} attempts: {error}")
+                logger.error(f"Connection error on {url} after {retries} attempts: {error}")
                 return None
 
 async def get_Data(api_url, payload=None, retries=3, backoff_delays=(0, 1, 2)):

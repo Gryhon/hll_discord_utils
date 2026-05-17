@@ -299,7 +299,7 @@ async def set_Map_Rotation (payload):
     await post_Data ("/api/set_map_rotation", payload)
 
 async def send_Player_Message (message):
-    await post_Data ("/api/message_player", message)
+    await post_Data("/api/message_player", message, retries=1, backoff_delays=(0,))
 
 async def Punish_Player (message):
     await post_Data ("/api/punish", message)
@@ -308,7 +308,7 @@ async def Switch_Player_Now (message):
     await post_Data ("/api/switch_player_now", message)
 
 async def kick_Player (payload):
-    await post_Data ("/api/kick", payload)
+    await post_Data("/api/kick", payload, retries=1, backoff_delays=(0,))
 
 async def get_Player_History (payload):
     data = await post_Data ("/api/get_players_history", payload)
