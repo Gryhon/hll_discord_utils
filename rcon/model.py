@@ -1,7 +1,7 @@
 import logging
 import random
 from datetime import datetime
-from lib.utils import J_Path, Jmes_Path
+from lib.utils import J_Path, Jmes_Path, J_XPath
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -143,7 +143,7 @@ class Maps():
             if len (result):
                 return result
             else:
-                return None
+                return []
             
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
@@ -300,12 +300,68 @@ class InGamePlayers ():
     def get_Ingame_Player_Level (self, player_id):
         try:
             if self.json:
-                level = J_Path.get_Match (f"result..players[?(@.player_id == '{player_id}')].level", self.json, "Not Found")
+                level = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].level", self.json, "Not Found")
 
                 if level != "Not Found":
                     return level
                 else:
                     return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+    def get_Role (self, player_id):
+        try:
+            if self.json:
+                role = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].role", self.json, "Not Found")
+
+                if role != "Not Found":
+                    return role
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+    def get_Squad_Name (self, player_id):
+        try:
+            if self.json:
+                squad = J_XPath.get_Parent (f'//players[player_id = "{player_id}"]/..', self.json)
+                fraction = J_XPath.get_Parent (f'//players[player_id = "{player_id}"]/../../..', self.json)
+
+                if len (squad) >= 1:
+                    ret1 = squad[0]
+                else:
+                    ret1 = None
+
+                if len (fraction) >= 1:
+                    ret2 = fraction[0]
+                else:
+                    ret2 = None
+                
+                return ret2, ret1
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+    def get_Squad_Members (self, fraction, squad):
+        try:
+            if self.json:
+                player_ids = J_XPath.get_Match (f'//{fraction}/squads/{squad}/players/player_id', self.json)
+
+                if player_ids != "Not Found":
+                    return player_ids
+                else:
+                    return None, None
             else:
                 logger.error(f"No Json data")    
 
@@ -324,7 +380,7 @@ class InGamePlayers ():
     def is_Ingame_Player_VIP (self, player_id):
         try:
             if self.json:
-                vip = J_Path.get_Match (f"result..players[?(@.player_id == '{player_id}')].is_vip", self.json, "Not Found")
+                vip = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].is_vip", self.json, "Not Found")
 
                 if vip and vip != "Not Found":
                     return True
@@ -336,13 +392,24 @@ class InGamePlayers ():
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return False
-        
-
+     
     def get_Ingame_Player_Name (self, player_id):
         try:
             if self.json:
-                name = J_Path.get_Match (f"result..players[?(@.player_id == '{player_id}')].name", self.json, "Not Found")
+                name = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].name", self.json, "Not Found")
 
+                return name                
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
+        
+    def get_Ingame_Player_ClanTag (self, player_id):
+        try:
+            if self.json:
+                name = J_Path.get_Match (f"$..*[?(@.player_id == '{player_id}')].clan_tag", self.json, "Not Found")
                 return name                
             else:
                 logger.error(f"No Json data")    
@@ -357,8 +424,13 @@ class InGamePlayers ():
 
                 if fraction != "both":
                     players = J_Path.get_Matches (f"$.result.{fraction}[*]..players[*].player_id", self.json)
+                    commander = J_Path.get_Matches (f"$.result.{fraction}[*]..commander[*].player_id", self.json)
+                    players.extend (commander)
+
                 else:
                     players = J_Path.get_Matches (f"$.result..players[*].player_id", self.json)
+                    commander = J_Path.get_Matches (f"$.result..commander[*].player_id", self.json)
+                    players.extend (commander)
 
                 return players                
             else:
@@ -427,6 +499,9 @@ class RecentLogs():
         self.logs = []
         self.json = None
 
+    def add_Json (self, json_string):
+        self.json = json_string
+
     def get_Timestamp (self, player_id):
         try:
             if self.json:
@@ -446,7 +521,171 @@ class RecentLogs():
             self.logs = J_Path.get_Matches ("$..logs[*].message", json_string)       
             logger.debug ("Message :" + str (self.logs))
         except:
-            logger.error ("Exception in RecentLogs")      
+            logger.error ("Exception in RecentLogs")
+        
+    def get_LogItem (self, item, attibute = None):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}].{str(attibute)}", self.json, "Not Found")
+                else:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}]", self.json, "Not Found")
+
+                if log_item != "Not Found":
+                    return log_item
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+class StructuredLogs():
+    def __init__(self):
+        self.logs = []
+        self.json = None
+
+    def add_Json (self, json_string):
+        self.json = json_string   
+
+    def parse_Json (self, json_string):
+        try:    
+            self.json = json_string
+            self.logs = J_Path.get_Matches ("$..logs[*].message", json_string)       
+            logger.debug ("Message :" + str (self.logs))
+        except:
+            logger.error ("Exception in StructuredLogs")
+        
+    def get_LogItem (self, item, attibute = None):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}].{str(attibute)}", self.json, "Not Found")
+                else:
+                    log_item = J_Path.get_Match (f"$.result.logs[{str(item)}]", self.json, "Not Found")
+
+                if log_item != "Not Found":
+                    return log_item
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+class HistoricalLogs():
+    def __init__(self):
+        self.logs = []
+        self.json = None
+
+    def add_Json (self, json_string):
+        self.json = json_string   
+
+    def parse_Json (self, json_string):
+        try:    
+            self.json = json_string
+            self.logs = J_Path.get_Matches ("$..result[*]", json_string)       
+            logger.debug ("Message :" + str (self.logs))
+        except:
+            logger.error ("Exception in StructuredLogs")
+
+    def get_LogItem (self, item, attibute = None):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    log_item = J_Path.get_Match (f"$.result[{str(item)}].{str(attibute)}", self.json, "Not Found")
+                else:
+                    log_item = J_Path.get_Match (f"$.result[{str(item)}]", self.json, "Not Found")
+
+                if log_item != "Not Found":
+                    return log_item
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+        
+class LiveScoreboard ():
+    def __init__(self):
+        self.logs = []
+        self.json = None
+
+    def add_Json (self, json_string):
+        self.json = json_string   
+
+    def parse_Json (self, json_string):
+        try:    
+            self.json = json_string
+            self.stats = J_Path.get_Matches ("$.result.stats[*]", json_string)       
+            logger.debug ("Message :" + str (self.logs))
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    def get_PlayerScore (self, player_id, attibute):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    stats = J_Path.get_Match (f"$.result.stats[?(@.player_id=='{str(player_id)}')].{str(attibute)}", self.json, "Not Found")
+                else:
+                    stats = J_Path.get_Match (f"$.result.stats[?(@.player_id=='{str(player_id)}')]", self.json, "Not Found")
+
+                if stats != "Not Found":
+                    return stats
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+class LiveGameStats ():
+    def __init__(self):
+        self.logs = []
+        self.json = None
+
+    def add_Json (self, json_string):
+        self.json = json_string   
+
+    def parse_Json (self, json_string):
+        try:    
+            self.json = json_string
+            self.stats = J_Path.get_Matches ("$.result.stats[*]", json_string)       
+            logger.debug ("Message :" + str (self.logs))
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    def get_PlayerStats (self, player_id, attibute):
+        try:
+            if self.json:
+
+                if attibute is not None:
+                    stats = J_Path.get_Match (f"$.result.stats[?(@.player_id=='{str(player_id)}')].{str(attibute)}", self.json, "Not Found")
+                else:
+                    stats = J_Path.get_Match (f"$.result.stats[?(@.player_id=='{str(player_id)}')]", self.json, "Not Found")
+
+                if stats != "Not Found":
+                    return stats
+                else:
+                    return None
+            else:
+                logger.error(f"No Json data")    
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
 
 class ServerStatus():
     def __init__(self):
@@ -468,14 +707,14 @@ class MapRotation ():
 
     def parse_Json (self, json_string):
         try:
-            map_ids = J_Path.get_Matches ("$.result[*].id", json_string)
+            map_ids = J_Path.get_Matches ("$.result.maps[*].id", json_string)
 
             for item in map_ids:
                 map = Map ()
                 map.id = item
-                map.pretty_name = J_Path.get_Match ("$.result[?(@.id == \"" + item + "\")].pretty_name", json_string)
-                map.environment = J_Path.get_Match ("$.result[?(@.id == \"" + item + "\")].environment", json_string)
-                map.image_name = J_Path.get_Match ("$.result[?(@.id == \"" + item + "\")].image_name", json_string)
+                map.pretty_name = J_Path.get_Match ("$.result.maps[?(@.id == \"" + item + "\")].pretty_name", json_string)
+                map.environment = J_Path.get_Match ("$.result.maps[?(@.id == \"" + item + "\")].environment", json_string)
+                map.image_name = J_Path.get_Match ("$.result.maps[?(@.id == \"" + item + "\")].image_name", json_string)
                 self.maps.append (map)  
         except:
             logger.error ("Exception in MapRotation")
@@ -636,3 +875,52 @@ class PlayerProfile ():
 
     def is_Blacklisted (self):
         pass
+
+    def get_Player_Name(self):
+        """Returns the most recent player name from the profile, or None if unavailable."""
+        try:
+            name = J_Path.get_Match("$.result.names[0].name", self.json, "Not Found")
+            return name if name and name != "Not Found" else None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def get_Vip_Expiry(self):
+        """Returns VIP expiry as a timezone-aware datetime, or None if the player has no VIP."""
+        try:
+            expiry_str = J_Path.get_Match("$.result.vips[*].expiration", self.json, "Not Found")
+            if expiry_str and expiry_str != "Not Found":
+                from datetime import datetime, timezone
+                dt = datetime.fromisoformat(expiry_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def is_Vip_Permanent(self):
+        """Returns True if the VIP expiry is year 2999 or later (permanent VIP convention)."""
+        try:
+            expiry = self.get_Vip_Expiry()
+            return expiry is not None and expiry.year >= 2999
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
+
+    def get_Vip_Days_Remaining(self):
+        """Returns the number of full VIP days remaining, or 0 if no VIP or expired.
+        Returns -1 for permanent VIP (expiry year >= 2999)."""
+        try:
+            from datetime import datetime, timezone
+            expiry = self.get_Vip_Expiry()
+            if expiry is None:
+                return 0
+            if self.is_Vip_Permanent():
+                return -1
+            delta = expiry - datetime.now(timezone.utc)
+            return max(0, delta.days)
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return 0

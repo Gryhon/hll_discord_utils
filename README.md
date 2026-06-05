@@ -40,7 +40,9 @@ CRCON is mainly designed and developed for PC gamers. For example, it is not pos
   - [Comfort](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#comfort)
   - [Artillery Calculator](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#artillery-calculator)
   - [Player Registration](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#player-registration)
-
+  - [Inappropriate Name Detection](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#inappropriate-name-detection)
+  - [Discord User Commands](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#discord-user-commands)
+  
 - [Installation](https://github.com/Gryhon/hll_discord_utils/wiki/Installation)
   - [Limitation](https://github.com/Gryhon/hll_discord_utils/wiki/Installation#installation)
   - [Precondition](https://github.com/Gryhon/hll_discord_utils/wiki/Installation#2-precondition)
@@ -57,5 +59,6 @@ CRCON is mainly designed and developed for PC gamers. For example, it is not pos
   - [v1.1.2 -> v1.1.3](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v112-to-v113)
   - [v1.1.3 -> v1.1.4](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v113-to-v114)
   - [v1.1.4 -> v1.1.5](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v114-to-v115)
+  - [v1.1.5 -> v1.2.0](https://github.com/Gryhon/hll_discord_utils/wiki/Update-Sofware#update-from---v115-to-v120)
 
 - [FAQ](https://github.com/Gryhon/hll_discord_utils/wiki/FAQ)

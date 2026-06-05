@@ -1,18 +1,119 @@
 import discord
 import logging
 import asyncio
+import random
+import time
+import rcon.model as model
 import rcon.rcon as rcon
 from typing import List
 from rcon.discord.discordbase import DiscordBase 
 from lib.config import config
 from discord.ext import commands
 from discord import app_commands
+from datetime import datetime, timedelta
 
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
 
-class Comfort (commands.Cog, DiscordBase):
+class AfterGameMessage (commands.Cog, DiscordBase):
+    def __init__(self, bot):
+        super().__init__()  
+        self.shutdown_event = asyncio.Event()
+        self.bot = bot
+        self.in_Loop = False
+        self.loop_started = False
+        self.game_last_active = None
+        self.game_active = None
+
+    async def background_task(self):
+        try:
+            while not self.shutdown_event.is_set():
+                await self.do_After_Game_Message()
+                await asyncio.sleep (5)
+
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+        await asyncio.sleep (5)
+
+    async def get_Game_State (self):
+        try:
+            data = []
+
+            payload = {
+                "end": 10000,
+                "filter_action": ["MATCH ENDED", "MATCH START"],
+                "filter_player": [],  
+                "inclusive_filter": "true"
+            }
+
+            data = await rcon.get_Recent_Logs (payload, model.RecentLogs)
+
+            if (not self.game_active or self.game_active == None) and len (data.logs) and "MATCH START" in data.logs[0]:
+                logger.info ("Game status: " + data.logs[0])
+                self.game_active = True
+
+            elif (self.game_active or self.game_active == None) and len (data.logs) and "MATCH ENDED" in data.logs[0]:
+                logger.info ("Game status: " + data.logs[0])
+                self.game_active = False
+
+            elif self.game_active == None:
+                self.game_active = False
+                logger.warning ("No game status information available.")
+
+            return self.game_active
+        
+        except discord.HTTPException as e:
+            logger.error(f"HTTP error occurred: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+       
+    async def do_After_Game_Message (self):
+        try:
+            game_active = await self.get_Game_State()
+
+            if self.game_last_active == True and game_active == False:
+
+                self.game_last_active = game_active
+
+                logger.info ("Game ended, sending after game message...")
+
+                messages = config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "messages", default=[])
+                after_game_message = random.choice(messages) if messages else ""
+
+                if after_game_message:
+                    players = await rcon.get_Players ()
+
+                    for player in players.players: 
+                        payload = {"player_id": str (player.player_id) , "message": str (after_game_message)}   
+
+                        if not (config.get("rcon", 0, "comfort_functions", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "comfort_functions", 0, "probands"):
+                            logger.info("After game message: " + str (payload)) 
+                            await rcon.send_Player_Message (payload)
+                        else:
+                            logger.info("Dry run after game message: " + str (payload)) 
+                            await asyncio.sleep (0.5)
+
+            elif self.game_last_active == False and game_active == True:
+                self.game_last_active = game_active
+                logger.info ("Game started, resetting after game message state.")
+
+            elif self.game_last_active == None:
+                logger.warning ("No game state information available. Setting game_active to False.")
+                self.game_last_active = False
+            
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.loop_started:
+            self.loop_started = True
+            self.bot.loop.create_task(self.background_task())
+            logger.info("Background task (AfterGameMessage) started")
+
+class BroadcastMessage (commands.Cog, DiscordBase):
     def __init__(self, bot):
         super().__init__()  
         self.shutdown_event = asyncio.Event()
@@ -21,23 +122,7 @@ class Comfort (commands.Cog, DiscordBase):
         self.loop_started = False
 
     async def query_Player_Database(self, query: str) -> List[str]:
-        try:
-            if len (query) > 1:       
-                payload ={"page_size": 25, "page": 1, "player_name": query}
-
-                result = await rcon.get_Player_History (payload)
-                players = result.get_Players_Name ()
-
-                if players != None and len (players):
-                    return players[:25]
-                else:
-                    return None
-            else:
-                return None
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return None
+        return await rcon.search_Players(query)
 
     async def send_Broadcast_Message (self, message, players):
         try:
@@ -56,17 +141,10 @@ class Comfort (commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
-    '''
-    async def calculate_Mils (self, distance, min_distance, max_distance, min_mils, max_mils):
-        mil = (((distance - min_distance) / (max_distance - min_distance)) * (min_mils - max_mils) + max_mils)
-        logger.debug (f"Calculated Mil value for distance {distance} = {mil}")
-        return round (mil)
-    '''
-
     async def background_task(self):
         while not self.shutdown_event.is_set():
             await asyncio.sleep (5)
-
+            
     @app_commands.command(name="broadcast_message", description="Broadcast message to players")
     @app_commands.describe(
         fraction="Choose the target audience",
@@ -124,7 +202,59 @@ class Comfort (commands.Cog, DiscordBase):
         if not self.loop_started:
             self.loop_started = True 
             self.bot.loop.create_task(self.background_task())
-            logger.info("Background task started")
+            logger.info("Background task (BroadcastMessage) started")
 
+class AutoUnban (commands.Cog, DiscordBase):
+    def __init__(self, bot):
+        super().__init__()  
+        self.shutdown_event = asyncio.Event()
+        self.bot = bot
+        self.in_Loop = False
+        self.loop_started = False
+        self.last_check = None
 
+    async def do_Auto_Unban (self):
+        try:
+            if self.last_check == None:
+                now = datetime.now()
+                self.last_check = now - timedelta(minutes=90)
+                logger.info (f"Initial last check time set to {self.last_check}")
+                        
+            payload = {"action": f"ADMIN BANNED",
+                       "from_": f"{self.last_check}",
+                       "time_sort": "desc"}
+            log_items = await rcon.get_Historical_Logs (payload)
+
+            self.last_check = datetime.now()
+
+            logger.info (f"Auto unban check from {self.last_check}, found {log_items.json} ban log items.")
         
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return False
+        
+
+    async def background_task(self):
+        last_execution = 0
+
+        while not self.shutdown_event.is_set():
+            current_time = time.time()
+
+            if current_time - last_execution >= 60 or last_execution == 0:
+                
+                try:
+                    await self.do_Auto_Unban()
+
+                except Exception as e:
+                    logger.error(f"Unexpected error: {e}")
+            
+                last_execution = current_time
+
+            await asyncio.sleep (5)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self.loop_started:
+            self.loop_started = True 
+            self.bot.loop.create_task(self.background_task())
+            logger.info("Background task (AutoUnban) started")
