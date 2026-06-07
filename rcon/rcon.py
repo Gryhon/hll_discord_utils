@@ -158,14 +158,78 @@ async def get_Balance (limits = [50, 100, 250], weights = [0.25, 0.5, 1, 1.25]):
         logger.error(f"Unexpected error: {e}")
         return await get_Balance_Return (limits)
 
-async def get_Recent_Logs (filter, generic_class):
-    data = await post_Data ("/api/get_recent_logs", filter)
+async def get_Recent_Logs (payload, generic_class = None):
+    data = await post_Data ("/api/get_recent_logs", payload)
 
-    if data:
+    if data and generic_class:
         generic = generic_class()
         generic.parse_Json(data)
 
         return generic
+    
+    elif data and not generic_class:
+        logs = model.RecentLogs()
+        logs.parse_Json(data)
+        
+        return logs
+    else:
+        return None
+    
+async def get_Structured_Logs (payload, generic_class = None):
+    data = await get_Data ("/api/get_structured_logs", payload)
+
+    if data and generic_class:
+        generic = generic_class()
+        generic.parse_Json(data)
+
+        return generic
+    
+    elif data and not generic_class:
+        logs = model.StructuredLogs()
+        logs.parse_Json(data)
+        
+        return logs
+    else:
+        return None
+    
+async def get_Historical_Logs (payload, generic_class = None):
+    data = await get_Data ("/api/get_historical_logs", payload)
+
+    if data and generic_class:
+        generic = generic_class()
+        generic.parse_Json(data)
+
+        return generic
+    
+    elif data and not generic_class:
+        logs = model.HistoricalLogs()
+        logs.parse_Json(data)
+        
+        return logs
+    else:
+        return None
+
+async def get_Live_Scoreboard ():
+    data = await get_Data ("/api/get_live_scoreboard")
+
+    if data:
+        scoreboard = model.LiveScoreboard()
+        
+        scoreboard.parse_Json(data)
+        
+        return scoreboard
+    else:
+        return None
+
+async def get_Live_Game_Stats ():
+    data = await get_Data ("/api/get_live_game_stats")
+
+    if data:
+        scoreboard = model.LiveGameStats()
+        
+        scoreboard.parse_Json(data)
+        
+        return scoreboard
     else:
         return None
 
@@ -182,7 +246,7 @@ async def get_Players ():
         return None
     
 async def get_Player_Profile (payload):
-    data = await post_Data ("/api/get_player_profile", payload)
+    data = await get_Data ("/api/get_player_profile", payload)
 
     if data:
         players = model.PlayerProfile()
@@ -220,7 +284,7 @@ async def get_Maps ():
 async def get_Map_History (cnt):
     data = await get_Data ("/api/get_map_history")
 
-    if data:
+    if data and cnt > 0:
         maps = model.MapHistory()
         
         maps.add_Json(data)
@@ -231,13 +295,20 @@ async def get_Map_History (cnt):
         return None 
 
 async def set_Map_Rotation (payload):
+    logger.info (f"Setting new map rotation: {payload}")
     await post_Data ("/api/set_map_rotation", payload)
 
 async def send_Player_Message (message):
-    await post_Data ("/api/message_player", message)
+    await post_Data("/api/message_player", message, retries=1, backoff_delays=(0,))
+
+async def Punish_Player (message):
+    await post_Data ("/api/punish", message)
+
+async def Switch_Player_Now (message):
+    await post_Data ("/api/switch_player_now", message)
 
 async def kick_Player (payload):
-    await post_Data ("/api/kick", payload)
+    await post_Data("/api/kick", payload, retries=1, backoff_delays=(0,))
 
 async def get_Player_History (payload):
     data = await post_Data ("/api/get_players_history", payload)
@@ -254,11 +325,41 @@ async def get_Player_History (payload):
 async def set_Watch_Player (payload):
     await post_Data ("/api/watch_player", payload)
 
+async def set_Unwatch_Player (payload):
+    await post_Data ("/api/unwatch_player", payload)
+
 async def set_Perma_Ban (payload):
     await post_Data ("/api/perma_ban", payload)
 
 async def add_Blacklist_Record (payload):
-    print (payload)
     await post_Data ("/api/add_blacklist_record", payload)
+
+async def set_Unban (payload):
+    await post_Data ("/api/unban", payload)
+
+async def remove_from_squad (payload):
+    await post_Data ("/api/remove_player_from_squad", payload)
+
+async def search_Players(query: str):
+    """Search player history by name fragment. Returns up to 25 results or None."""
+    logger.info(f"search_Players called with query={query!r}")
+    if len(query) > 1:
+        data = await get_Player_History({"page_size": 25, "page": 1, "player_name": query})
+        if data:
+            players = data.get_Players_Name()
+            logger.info(f"search_Players got {len(players) if players else 0} result(s)")
+            if players:
+                return players[:25]
+        else:
+            logger.warning("search_Players: get_Player_History returned no data")
+    else:
+        logger.info("search_Players: query too short, skipping")
+    return None
+
+async def add_Vip(payload):
+    await post_Data("/api/add_vip", payload)
+
+async def remove_Vip(payload):
+    await post_Data("/api/remove_vip", payload)
 
     

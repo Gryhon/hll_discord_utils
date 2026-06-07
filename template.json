@@ -1,72 +1,192 @@
 {
+    "config_version": 2,
     "rcon": [
         {
-            "server_number": 1,
             "api_url": "",
-            "stats_url": "",
             "bearer_token": "",
             "discord_token": "",
+            "guild_id": 0,
             "log_level": "INFO",
-            
-            "register_player": [{
-                "enabled": false,
-                "verify_ingame": false
-            }],
-            "comfort_functions": [{
-                "enabled": false,
-                "dryrun": false
-            }],
-            "map_rotation": [{
-                "enabled": false,
-                "webhook": ""
-            }],
-            "server_status": [{
-                "enabled": false,
-                "webhook": ""
-            }],
-            "artillery_calculator": [{
-                "enabled": false,
-                "interval": 100, 
-                "in_game_messages": true
-            }],
-            "server_balance": [{
-                "enabled": false,
-                "level_categories": [10, 25, 50, 100, 150, 200, 250],
-                "combat_weights": [0.1, 0.25, 0.25, 0.5, 1, 1, 1, 1.25],
-                "webhook": ""
-            }],
-            "auto_level": [{
-                "enabled": false,
-                "dryrun": false,
-                "min_level": 50,
-                "allow_vips": true,
-                "player_count": 60,
-                "levelbug_enabled": true,
-                "kick_message": "Your level is below {min_level} or you don't own a VIP seat. This server has an adaptive level cap."
-            }],
-            "map_vote": [{
-                "enabled": false,
-                "dryrun": false,
-                "activate_vote": 1,
-                "dectivate_vote": 0,
-                "vote_channel_id": 0,
-                "reminder": 20,
-                "stealth_vote": false,
-                "max_reminders_per_game": 0,
-                "vote_header": "Vote for the nextmap on <your discord>",
-                "duplicate_maps": true,
-                "map_pool": [{
-                    "day": 0,
-                    "night": 0,
-                    "wildcard": 0,
-                    "enforce": 0,
-                    "battle_mode": [],
-                    "wildcard_mode": [],
-                    "enforced_maps": [],
-                    "blacklist_maps": [],
-                    "exclude_played_maps": 0
-                }]
-            }],
+            "server_number": 1,
+            "stats_url": "",
+            "artillery_calculator": [
+                {
+                    "enabled": false,
+                    "in_game_messages": true,
+                    "interval": 100
+                }
+            ],
+            "auto_level": [
+                {
+                    "allow_vips": true,
+                    "dryrun": false,
+                    "enabled": false,
+                    "kick_message": "Your level is below {min_level} or you don't own a VIP seat. This server has an adaptive level cap.",
+                    "levelbug_enabled": true,
+                    "min_level": 50,
+                    "player_count": 60
+                }
+            ],
+            "comfort_functions": [
+                {
+                    "dryrun": false,
+                    "enabled": false,
+                    "after_game_message": [
+                        {
+                            "enabled": false,
+                            "messages": [
+                                [
+                                    "After game message here",
+                                    "Or second message here"
+                                ]
+                            ]
+                        }
+                    ],
+                    "auto_unban": [
+                        {
+                            "Clan": false,
+                            "VIP": true,
+                            "enabled": false,
+                            "Clans": [
+                                ""
+                            ]
+                        }
+                    ],
+                    "broadcast_message": [
+                        {
+                            "enabled": false
+                        }
+                    ]
+                }
+            ],
+            "discord_commands": [
+                {
+                    "admin_always": false,
+                    "dryrun": false,
+                    "enabled": false,
+                    "groups": [
+                        ""
+                    ],
+                    "punish_me": [
+                        {
+                            "enabled": false,
+                            "groups": [
+                                ""
+                            ]
+                        }
+                    ],
+                    "remove_player_from_squad": [
+                        {
+                            "enabled": false,
+                            "groups": [
+                                ""
+                            ]
+                        }
+                    ],
+                    "switch_me": [
+                        {
+                            "enabled": false,
+                            "groups": [
+                                ""
+                            ]
+                        }
+                    ],
+                    "vip_management": [
+                        {
+                            "allow_gift_from_permanent": false,
+                            "dryrun": false,
+                            "enabled": false,
+                            "groups": [
+                                ""
+                            ]
+                        }
+                    ],
+                    "who_killed_me": [
+                        {
+                            "enabled": false,
+                            "groups": [
+                                ""
+                            ]
+                        }
+                    ],
+                    "whom_i_killed": [
+                        {
+                            "enabled": false,
+                            "groups": [
+                                ""
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "inappropriate_name": [
+                {
+                    "blacklist_id": 0,
+                    "channel_id": 0,
+                    "check_history_once": false,
+                    "dryrun": false,
+                    "enabled": false,
+                    "kick_message": "Your name violates server rules. Please change it before rejoining.",
+                    "perma_ban_message": "Your name violates server rules (permanent ban).",
+                    "temp_ban_duration": 0,
+                    "temp_ban_message": "Your name violates server rules (temp ban).",
+                    "threshold": 0.85,
+                    "watch_message": "Watchlist message",
+                    "blacklist": [],
+                    "whitelist": []
+                }
+            ],
+            "map_rotation": [
+                {
+                    "enabled": false,
+                    "webhook": ""
+                }
+            ],
+            "map_vote": [
+                {
+                    "activate_vote": 1,
+                    "audit_webhook": "",
+                    "dectivate_vote": 0,
+                    "dryrun": false,
+                    "duplicate_maps": true,
+                    "enabled": false,
+                    "max_reminders_per_game": 0,
+                    "reminder": 20,
+                    "stealth_vote": false,
+                    "vote_channel_id": 0,
+                    "vote_header": "Vote for the nextmap on <your discord>",
+                    "map_pool": [
+                        {
+                            "day": 0,
+                            "enforce": 0,
+                            "exclude_played_maps": 0,
+                            "night": 0,
+                            "profile": "default",
+                            "wildcard": 0,
+                            "battle_mode": [],
+                            "blacklist_maps": [],
+                            "enforced_maps": [],
+                            "wildcard_mode": []
+                        }
+                    ],
+                    "schedule": [
+                        {
+                            "off": "00:30",
+                            "on": "14:00",
+                            "profile": "default",
+                            "days": [
+                                "mon",
+                                "tue",
+                                "wed",
+                                "thu",
+                                "fri",
+                                "sat",
+                                "sun"
+                            ]
+                        }
+                    ]
+                }
+            ],
             "map_rotation_vote": [{
                 "enabled": false,
                 "dryrun": false,
@@ -87,7 +207,44 @@
                     "enforced_maps": [],
                     "blacklist_maps": []
                 }]
-            }]            
+            }],
+            "register_player": [
+                {
+                    "enabled": false,
+                    "verify_ingame": false
+                }
+            ],
+            "server_balance": [
+                {
+                    "enabled": false,
+                    "webhook": "",
+                    "combat_weights": [
+                        0.1,
+                        0.25,
+                        0.25,
+                        0.5,
+                        1,
+                        1,
+                        1,
+                        1.25
+                    ],
+                    "level_categories": [
+                        10,
+                        25,
+                        50,
+                        100,
+                        150,
+                        200,
+                        250
+                    ]
+                }
+            ],
+            "server_status": [
+                {
+                    "enabled": false,
+                    "webhook": ""
+                }
+            ]
         }
     ]
 }

@@ -2,7 +2,8 @@ import discord
 import logging
 import asyncio
 import time
-from rcon.discord.discordbase import DiscordBase 
+from functools import partial
+from rcon.discord.discordbase import DiscordBase
 import rcon.rcon as rcon
 from lib.config import config
 from datetime import datetime
@@ -81,37 +82,38 @@ class Balance (commands.Cog, DiscordBase):
                 description="This function is intended to show how balanced a game is.\n\n",
                 color=discord.Color.green(),
                 )
-   
-            wt.add_field(name="\u200b", value="", inline=False)   
-            
-            text = ("```" + 
+
+            wt.add_field(name="\u200b", value="", inline=False)
+
+            text = ("```" +
                     "    Allies: " + str (round (allies_weight, 1)) + " vs. Axis: " + str (round (axis_weight, 1)) + "```")
-                
+
             wt.add_field(name="Combat strength", value=text, inline=True)
-            wt.add_field(name="\u200b", value="", inline=False) 
+            wt.add_field(name="\u200b", value="", inline=False)
 
             table = self.generate_Table (self.limits, allies, axis)
 
-            wt.add_field(name="Balance of forces", value=table, inline=False) 
-            
+            wt.add_field(name="Balance of forces", value=table, inline=False)
+
             wt.set_footer(text=f"(Provided by Gryhon)")
             wt.timestamp = datetime.now()
-            
+
+            loop = asyncio.get_event_loop()
             if not self.msg_id:
-                self.msg_id = self.webhook.send(embeds=[wt], wait=True).id
-                self.insert_Message_Id(__name__, self.msg_id)  
+                msg = await loop.run_in_executor(None, partial(self.webhook.send, embeds=[wt], wait=True))
+                self.msg_id = msg.id
+                self.insert_Message_Id(__name__, self.msg_id)
                 self.insert_Balance (self.limits, allies, axis)
             else:
                 try:
-                    # Check if the message still exists.
-                    self.webhook.fetch_message(self.msg_id)
-                    # Edit the message if it exists.
-                    self.webhook.edit_message(message_id=self.msg_id, embeds=[wt])
+                    await loop.run_in_executor(None, partial(self.webhook.fetch_message, self.msg_id))
+                    await loop.run_in_executor(None, partial(self.webhook.edit_message, message_id=self.msg_id, embeds=[wt]))
                     self.insert_Balance (self.limits, allies, axis)
 
                 except discord.NotFound:
                     logger.warning(f"Message with ID {self.msg_id} not found. Sending a new message.")
-                    self.msg_id = self.webhook.send(embeds=[wt], wait=True).id
+                    msg = await loop.run_in_executor(None, partial(self.webhook.send, embeds=[wt], wait=True))
+                    self.msg_id = msg.id
                     self.update_Message_Id (__name__, self.msg_id)
                     self.insert_Balance (self.limits, allies, axis)
 

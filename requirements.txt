@@ -5,3 +5,7 @@ pytz>=2024.2
 requests>=2.32.3
 python-dateutil>=2.9.0
 numpy>=2.2.2
+rapidfuzz>=3.14.1 
+phonetics>=1.0.5
+jellyfish>=1.2.0
+hllrcon>=0.1.2

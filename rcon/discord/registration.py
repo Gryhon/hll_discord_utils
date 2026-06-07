@@ -54,25 +54,9 @@ class Registration(commands.Cog, DiscordBase):
         self.loop_started = False
     
     async def query_Player_Database(self, query: str) -> List[str]:
-        try:
-            if len (query) > 1:       
-                payload ={"page_size": 25, "page": 1, "player_name": query}
+        return await rcon.search_Players(query)
 
-                result = await rcon.get_Player_History (payload)
-                player = result.get_Players_Name ()
-
-                if player is not None and len (player):
-                    return player[:25]
-                else:
-                    return None
-            else:
-                return None
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            return None
-
-    @app_commands.command(name="register_user", description="Combine you Discord user with you T17 account")
+    @app_commands.command(name="link_t17_user", description="Combine you Discord user with you T17 account")
     @app_commands.describe(ingame_name="Choose you in game user",)
     @app_commands.choices(vote_reminders=[
         app_commands.Choice(name="Remind me if I haven't voted yet", value=1),

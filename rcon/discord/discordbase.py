@@ -172,7 +172,7 @@ class DiscordBase:
 
         # Migrate the table to add new features
         try:
-# Add new columns using existing helper method
+            # Add new columns using existing helper method
             self.ensure_column_exists("voter_register", "votreg_clan_tag", "TEXT")
             self.ensure_column_exists("voter_register", "votreg_t17_number", "TEXT")
             self.ensure_column_exists("voter_register", "votreg_emojis", "TEXT")
@@ -202,6 +202,9 @@ class DiscordBase:
             inanme_seqno INTEGER PRIMARY KEY AUTOINCREMENT,
             inanme_player_id TEXT,
             inanme_name TEXT,
+            inname_clan TEXT,
+            inname_match TEXT,
+            ingame_score TEXT,
             inanme_message_id TEXT,
             inanme_decision TEXT,
             inanme_datetime INTERGER
@@ -209,6 +212,17 @@ class DiscordBase:
         ''')
 
         self.conn.commit()  
+
+         # Migrate the table to add new features
+        try:
+            # Add new columns using existing helper method
+            self.ensure_column_exists("inappropriate_name", "inname_clan", "TEXT")
+            self.ensure_column_exists("inappropriate_name", "inname_match", "TEXT")
+            self.ensure_column_exists("inappropriate_name", "ingame_score", "TEXT")
+        
+        except Exception as e:
+            self.conn.rollback()
+            logger.error(f"Failed to update voter_register: {e}")
 
     def create_Key_Value(self):
         # Creates the table if it does not yet exist
@@ -301,15 +315,15 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")   
 
-    def insert_Inappropriate_Name(self, player_id, player_name, decision, msg_id):
+    def insert_Inappropriate_Name(self, player_id, player_name, player_clan, match, score, decision, msg_id):
         try:
-            # Insert the message ID in the database
+            # Insert the message ID in the database.  
             self.cursor.execute(
                 '''
-                INSERT INTO inappropriate_name (inanme_player_id, inanme_name, inanme_message_id, inanme_decision, inanme_datetime) 
-                VALUES (?, ?, ?, ?, ?)
+                INSERT INTO inappropriate_name (inanme_player_id, inanme_name, inname_clan, inname_match, ingame_score, inanme_message_id, inanme_decision, inanme_datetime) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ''', 
-                (player_id, player_name, str(msg_id), decision, int(time.time()))
+                (player_id, player_name, player_clan, match, score, str(msg_id), decision, int(time.time()))
             )
             self.conn.commit()  
         except Exception as e:
@@ -325,14 +339,34 @@ class DiscordBase:
             self.cursor.execute(query, (value, player_id))
             self.conn.commit()
 
-            logger.info (f"Updated {column} to {value} for inanme_player_id {player_id}")
-
         except ValueError as e:
             logger.error(f"ValueError: {e}")
         except sqlite3.OperationalError as e:
             logger.error(f"SQLite OperationalError: {e}")
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
+
+    def delete_Pending_Without_Message_Id(self):
+        try:
+            self.cursor.execute(
+                "DELETE FROM inappropriate_name WHERE inanme_decision = 'pending' AND (inanme_message_id IS NULL OR inanme_message_id = '')"
+            )
+            deleted = self.cursor.rowcount
+            self.conn.commit()
+            if deleted:
+                logger.info(f"Deleted {deleted} pending inappropriate_name entries without message_id.")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting pending entries without message_id: {e}")
+
+    def delete_Inappropriate_Name(self, player_id):
+        try:
+            self.cursor.execute(
+                'DELETE FROM inappropriate_name WHERE inanme_player_id = ?', (player_id,)
+            )
+            self.conn.commit()
+            logger.info(f"Deleted inappropriate_name entry for inanme_player_id {player_id}")
+        except Exception as e:
+            logger.error(f"Unexpected error deleting inappropriate_name: {e}")
 
     def select_Inappropriate_Name(self, player_id):
         try:
@@ -353,6 +387,36 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Error during SELECT operation: {e}")
             return None
+
+    def select_All_Inappropriate_Message_Ids(self) -> set:
+        """Alle gespeicherten Message-IDs aus der inappropriate_name Tabelle als Set zurückgeben."""
+        try:
+            self.cursor.execute(
+                "SELECT inanme_message_id FROM inappropriate_name WHERE inanme_message_id IS NOT NULL AND inanme_message_id != ''"
+            )
+            return {row[0] for row in self.cursor.fetchall()}
+        except Exception as e:
+            logger.error(f"Error selecting inappropriate message IDs: {e}")
+            return set()
+
+    def select_Open_Inappropriate_Names(self):
+        """Returns all pending entries for view restoration on bot restart.
+        Only 'pending' entries have an open Discord message that needs a view attached."""
+        try:
+            self.cursor.execute(
+                '''
+                SELECT inanme_player_id, inanme_name, inname_clan, inanme_message_id, inanme_decision
+                FROM inappropriate_name
+                WHERE inanme_decision = 'pending'
+                  AND inanme_message_id IS NOT NULL
+                  AND inanme_message_id != ''
+                ORDER BY inanme_seqno ASC
+                '''
+            )
+            return self.cursor.fetchall() or []
+        except Exception as e:
+            logger.error(f"Error during SELECT open inappropriate names: {e}")
+            return []
 
     def insert_Balance(self, limits, allies, axis):
         try:
