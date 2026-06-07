@@ -187,6 +187,27 @@
                     ]
                 }
             ],
+            "map_rotation_vote": [{
+                "enabled": false,
+                "dryrun": false,
+                "vote_channel_id": 0,
+                "duration_days": 7,
+                "duration_hours": 0,
+                "top_maps_to_set": 10,
+                "reminder_interval_hours": 24,
+                "max_reminders_per_game": 1,
+                "stealth_vote": false,
+                "vote_header": "Vote for Map Rotation on <your discord>",
+                "maps_per_poll": 10,
+                "map_pool": [{
+                    "dusk": 0,
+                    "overcast": 0,
+                    "night": 0,
+                    "battle_mode": [],
+                    "enforced_maps": [],
+                    "blacklist_maps": []
+                }]
+            }],
             "register_player": [
                 {
                     "enabled": false,

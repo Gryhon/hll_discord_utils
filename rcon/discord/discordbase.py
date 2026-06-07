@@ -22,6 +22,8 @@ class DiscordBase:
         self.create_Voter_Register_Table()
         self.create_Inappropriate_Name_Table()
         self.create_Key_Value()
+        self.create_Rotation_Vote_Table()
+        self.create_Rotation_Vote_History_Table()
 
     def create_Message_Table(self):
         # Creates the table if it does not yet exist
@@ -602,6 +604,115 @@ class DiscordBase:
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return False
+
+    def create_Rotation_Vote_Table(self):
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS rotation_vote (
+            rotvot_seqno INTEGER PRIMARY KEY AUTOINCREMENT,
+            rotvot_msg_id INTEGER,
+            rotvot_part INTEGER,
+            rotvot_start_date TEXT,
+            rotvot_end_date TEXT
+        )
+        ''')
+        self.conn.commit()
+
+    def insert_Rotation_Vote(self, msg_id, part, start_date, end_date):
+        try:
+            self.cursor.execute(
+                'INSERT INTO rotation_vote (rotvot_msg_id, rotvot_part, rotvot_start_date, rotvot_end_date) VALUES (?, ?, ?, ?)',
+                (int(msg_id), int(part), str(start_date), str(end_date))
+            )
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    def select_Active_Rotation_Votes(self):
+        try:
+            self.cursor.execute(
+                'SELECT rotvot_msg_id, rotvot_part FROM rotation_vote ORDER BY rotvot_part ASC'
+            )
+            result = self.cursor.fetchall()
+            return result if result else []
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return []
+
+    def select_Rotation_Vote_End_Date(self):
+        try:
+            self.cursor.execute(
+                'SELECT rotvot_end_date FROM rotation_vote ORDER BY rotvot_seqno DESC LIMIT 1'
+            )
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def delete_Rotation_Votes(self):
+        try:
+            self.cursor.execute('DELETE FROM rotation_vote')
+            self.conn.commit()
+            logger.info("Deleted all rotation_vote records")
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    def select_Rotation_Vote_Dates(self):
+        try:
+            self.cursor.execute(
+                'SELECT rotvot_start_date, rotvot_end_date FROM rotation_vote ORDER BY rotvot_seqno ASC LIMIT 1'
+            )
+            result = self.cursor.fetchone()
+            return (result[0], result[1]) if result else (None, None)
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return (None, None)
+
+    def create_Rotation_Vote_History_Table(self):
+        self.cursor.execute('''
+        CREATE TABLE IF NOT EXISTS rotation_vote_history (
+            rotvothist_seqno INTEGER PRIMARY KEY AUTOINCREMENT,
+            rotvothist_start_date TEXT,
+            rotvothist_end_date TEXT,
+            rotvothist_result_maps TEXT,
+            rotvothist_completed_at INTEGER,
+            rotvothist_msg_ids TEXT
+        )
+        ''')
+        self.conn.commit()
+
+    def insert_Rotation_Vote_History(self, start_date, end_date, result_maps, msg_ids):
+        try:
+            self.cursor.execute(
+                '''INSERT INTO rotation_vote_history
+                   (rotvothist_start_date, rotvothist_end_date, rotvothist_result_maps, rotvothist_completed_at, rotvothist_msg_ids)
+                   VALUES (?, ?, ?, ?, ?)''',
+                (str(start_date), str(end_date), str(result_maps), int(time.time()), str(msg_ids))
+            )
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+
+    def select_Last_Rotation_Vote_History_Msg_Ids(self):
+        try:
+            self.cursor.execute(
+                'SELECT rotvothist_msg_ids FROM rotation_vote_history ORDER BY rotvothist_seqno DESC LIMIT 1'
+            )
+            result = self.cursor.fetchone()
+            return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def clear_Last_Rotation_Vote_History_Msg_Ids(self):
+        try:
+            self.cursor.execute(
+                '''UPDATE rotation_vote_history SET rotvothist_msg_ids = NULL
+                   WHERE rotvothist_seqno = (SELECT MAX(rotvothist_seqno) FROM rotation_vote_history)'''
+            )
+            self.conn.commit()
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
 
     def get_voter_reminder_preference(self, user_id):
         try:
