@@ -17,9 +17,9 @@ from lib.config import config
 from datetime import timedelta, datetime, timezone
 from pathlib import Path
 
-_HLL_ACTIVE = Path(__file__).resolve().parent.parent.parent / "Assets/HLL" / "MapVote_HLL_active.png"
-_HLL_PAUSE  = Path(__file__).resolve().parent.parent.parent / "Assets/HLL" / "MapVote_HLL_pause.png"
-_HLL_ADMIN  = Path(__file__).resolve().parent.parent.parent / "Assets/HLL" / "MapVote_HLL_admin.png"
+_HLL_ACTIVE = Path(__file__).resolve().parent.parent.parent / "Assets" / "MapVote_active.png"
+_HLL_PAUSE  = Path(__file__).resolve().parent.parent.parent / "Assets" / "MapVote_pause.png"
+_HLL_ADMIN  = Path(__file__).resolve().parent.parent.parent / "Assets" / "MapVote_admin.png"
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -92,8 +92,8 @@ class VoteMap(commands.Cog, DiscordBase):
                     timestamp=datetime.now(timezone.utc),
                 )
                 embed.add_field(name="▶️  Resumes at", value=f"<t:{on_ts}:t>\n<t:{on_ts}:R>", inline=True)
-                file = discord.File(_HLL_PAUSE, filename="MapVote_HLL_pause.png")
-                embed.set_image(url="attachment://MapVote_HLL_pause.png")
+                file = discord.File(_HLL_PAUSE, filename="MapVote_pause.png")
+                embed.set_image(url="attachment://MapVote_pause.png")
             else:
                 embed = discord.Embed(
                     title="🛑  Map Vote — Paused by Admin",
@@ -104,8 +104,8 @@ class VoteMap(commands.Cog, DiscordBase):
                     color=discord.Color.red(),
                     timestamp=datetime.now(timezone.utc),
                 )
-                file = discord.File(_HLL_ADMIN, filename="MapVote_HLL_admin.png")
-                embed.set_image(url="attachment://MapVote_HLL_admin.png")
+                file = discord.File(_HLL_ADMIN, filename="MapVote_admin.png")
+                embed.set_image(url="attachment://MapVote_admin.png")
             
             embed.set_footer(text="(Provided by Gryhon)")
             
@@ -128,9 +128,9 @@ class VoteMap(commands.Cog, DiscordBase):
                 color=discord.Color.from_rgb(88, 101, 242),
                 timestamp=datetime.now(timezone.utc),
             )
-            embed.set_image(url="attachment://MapVote_HLL_active.png")
+            embed.set_image(url="attachment://MapVote_active.png")
             embed.set_footer(text="(Provided by Gryhon)")
-            file = discord.File(_HLL_ACTIVE, filename="MapVote_HLL_active.png")
+            file = discord.File(_HLL_ACTIVE, filename="MapVote_active.png")
             self.seeding_msg = await self.vote_channel.send(embed=embed, file=file)
             logger.info ("Server is seeding message ID: " + str (self.seeding_msg.id))
 
@@ -485,7 +485,7 @@ class VoteMap(commands.Cog, DiscordBase):
             day_cnt = config.get("rcon", 0, "map_vote", 0, "map_pool", index, "day")
 
             if day_cnt > 0:
-                day_list = all_maps.get_Map_Names (["day", "dusk", "overcast"], modes, blacklist, duplicate_maps)
+                day_list = all_maps.get_Map_Names (["day", "dusk", "overcast", "rain"], modes, blacklist, duplicate_maps)
                 logger.info (f"Day list before random selection: {day_list}")
                 day_list = await self.get_Random_Items (day_list, day_cnt)
                 result.extend (day_list)
