@@ -68,37 +68,37 @@ class FuzzyNameMatcher:
     def set_namelist(self, blacklist: List[str]):
         """Blacklist übernehmen und phonetische Codes vorbereiten"""
         self.blacklist_orig = list(blacklist)
-        self.blacklist = [self._normalize(name) for name in blacklist]
+        self.blacklist = [self.normalize(name) for name in blacklist]
         # Kurze Einträge (≤ 2 Buchstaben im Original, z.B. "Z", "SA", "SS") oder rein numerische
         # Einträge (z.B. "88", "14", "420") sollen nur als eigenständiges Wort/Token matchen,
         # nicht als Substring in einem längeren Namen.
         self.blacklist_is_short = [
             len(re.sub(r'[^a-zA-Z]', '', name)) <= 2 for name in blacklist
         ]
-        self.phonetic_blacklist_dm = [self._phonetic_dm(name) for name in self.blacklist]
-        self.phonetic_blacklist_sx = [self._phonetic_sx(name) for name in self.blacklist]
+        self.phonetic_blacklist_dm = [self.phonetic_Dm(name) for name in self.blacklist]
+        self.phonetic_blacklist_sx = [self.phonetic_Sx(name) for name in self.blacklist]
 
     def set_whitelist(self, whitelist: List[str]):
         """Whitelist für bekannte harmlose Namen setzen"""
-        self.whitelist = [self._normalize(w) for w in whitelist]
+        self.whitelist = [self.normalize(w) for w in whitelist]
 
     def get_match(self, name: str) -> Tuple[float, str]:
         """Gibt Wahrscheinlichkeit und den Blacklist-Treffer zurück"""
-        return self._compute_probability(name)
+        return self.compute_Probability(name)
 
     def check_name(self, name: str) -> bool:
         """Prüft, ob der Name auf der Blacklist ist"""
-        prob, _ = self._compute_probability(name)
+        prob, _ = self.compute_Probability(name)
         return prob >= self.threshold
 
     def get_probability(self, name: str) -> float:
         """Gibt Wahrscheinlichkeit zurück (0..1)"""
-        prob, _ = self._compute_probability(name)
+        prob, _ = self.compute_Probability(name)
         return prob
 
     # --- internal methods ---
 
-    def _normalize_no_leet(self, name: str) -> str:
+    def normalize_No_Leet(self, name: str) -> str:
         """Normalisierung ohne Leet-Substitution (Ziffern bleiben als Ziffern).
         Dient als Referenz: Trifft ein Blacklist-Term hier, ist es ein nativer Buchstaben-Match
         und kein Artefakt der Leet-Konvertierung von Ziffern."""
@@ -109,7 +109,7 @@ class FuzzyNameMatcher:
         name = re.sub(r'[^a-z0-9]', '', name)
         return name
 
-    def _normalize(self, name: str) -> str:
+    def normalize(self, name: str) -> str:
         # Schritt 1: Visuelle Homoglyphen ersetzen (kyrillisch/griechisch → lateinisch)
         name = name.translate(_HOMOGLYPH_TABLE)
         # Schritt 2: Unicode-Normalisierung (Akzente, verbleibende Komposita)
@@ -124,37 +124,37 @@ class FuzzyNameMatcher:
         name = re.sub(r'[^a-z0-9]', '', name)
         return name
 
-    def _tokenize(self, raw_name: str) -> List[str]:
+    def tokenize(self, raw_name: str) -> List[str]:
         """Eingabename in Tokens aufteilen (Leerzeichen, Underscore, camelCase).
         Nur Tokens mit mind. 3 Zeichen, um Einzel-/Zwei-Zeichen-Fragmente aus
         CamelCase-Splits zu ignorieren (z.B. 'z' aus 'zEEEEtKa')."""
         split = re.sub(r'([a-z])([A-Z])', r'\1 \2', raw_name)
         tokens = re.findall(r'[a-zA-Z0-9]+', split)
-        normalized = list({self._normalize(t) for t in tokens if len(t) >= 3})
+        normalized = list({self.normalize(t) for t in tokens if len(t) >= 3})
         return normalized
 
-    def _natural_tokens(self, raw_name: str) -> List[str]:
+    def natural_Tokens(self, raw_name: str) -> List[str]:
         """Tokens nur an natürlichen Grenzen (Leerzeichen, Underscore, Ziffernblöcke) —
         kein CamelCase-Split. Für kurze Blacklist-Terme, die als ganzes Wort stehen müssen.
         Buchstaben- UND Zifferngruppen werden separat extrahiert, damit z.B. '88' als
         eigenständiger Token erkannt wird ('88' → leet → 'bb' matcht Blacklist-Eintrag '88')."""
         tokens = re.findall(r'[a-zA-Z]+|[0-9]+', raw_name)
-        return list({self._normalize(t) for t in tokens if t})
+        return list({self.normalize(t) for t in tokens if t})
 
-    def _phonetic_dm(self, name: str) -> str:
+    def phonetic_Dm(self, name: str) -> str:
         """Double Metaphone Code"""
         codes = phonetics.dmetaphone(name)
         return codes[0] if codes and codes[0] else ""
 
-    def _phonetic_sx(self, name: str) -> str:
+    def phonetic_Sx(self, name: str) -> str:
         """Soundex Code"""
         return jellyfish.soundex(name) if name else ""
 
-    def _is_whitelisted(self, name_norm: str) -> bool:
+    def is_Whitelisted(self, name_norm: str) -> bool:
         """True wenn der normalisierte Name einem Whitelist-Eintrag entspricht oder damit beginnt"""
         return any(name_norm == w or name_norm.startswith(w) for w in self.whitelist)
 
-    def _sliding_window_score(self, name_norm: str, blk: str, min_ratio: float = 0.24) -> float:
+    def sliding_Window_Score(self, name_norm: str, blk: str, min_ratio: float = 0.24) -> float:
         """
         Prüft alle Teilstrings des normalisierten Namens der Länge len(blk) ± 1
         auf DL-Ähnlichkeit. Fängt Fälle wie "xxhitlerxx" oder eingebettete
@@ -182,23 +182,23 @@ class FuzzyNameMatcher:
                     best = sim
         return best
 
-    def _compute_probability(self, name: str) -> Tuple[float, str]:
-        name_norm = self._normalize(name)
+    def compute_Probability(self, name: str) -> Tuple[float, str]:
+        name_norm = self.normalize(name)
 
         # Whitelist: bekannte harmlose Namen direkt ausschließen
-        if self._is_whitelisted(name_norm):
+        if self.is_Whitelisted(name_norm):
             return 0.0, ""
 
         # Pre-Leet-Referenz: Name ohne Leet-Substitution.
         # Dient zur Unterscheidung zwischen nativen Buchstaben-Matches ("jew" in "jewkiller")
         # und reinen Leet-Digit-Artefakten ("gas" aus "9457" in "carlos9457").
-        name_preleet = self._normalize_no_leet(name)
+        name_preleet = self.normalize_No_Leet(name)
 
         # Eingabe-Tokens für Token-basiertes Matching
-        name_tokens = self._tokenize(name)
+        name_tokens = self.tokenize(name)
 
-        name_dm = self._phonetic_dm(name_norm)
-        name_sx = self._phonetic_sx(name_norm)
+        name_dm = self.phonetic_Dm(name_norm)
+        name_sx = self.phonetic_Sx(name_norm)
         max_prob = 0.0
         matched_orig = ""
 
@@ -215,7 +215,7 @@ class FuzzyNameMatcher:
             # Kurze Terme (≤ 2 Buchstaben im Original, z.B. "Z", "SA", "SS") oder rein numerische
             # Einträge: nur Wort-Grenz-Matching — der Term muss als eigenständiges Wort stehen.
             if is_short:
-                natural = self._natural_tokens(name)
+                natural = self.natural_Tokens(name)
                 if blk in natural:
                     return 1.0, blk_orig
                 continue
@@ -246,7 +246,7 @@ class FuzzyNameMatcher:
             #    Native Matches: min_ratio 0.24 (z.B. "jew" in "jewhaunterge" = 3/12 = 0.25).
             #    Leet-Digit-Matches: min_ratio 0.35 (verhindert "gas" aus "9457" in kurzen Namen).
             win_min_ratio = 0.24 if native_match else 0.35
-            win_score = self._sliding_window_score(name_norm, blk, min_ratio=win_min_ratio)
+            win_score = self.sliding_Window_Score(name_norm, blk, min_ratio=win_min_ratio)
             score = max(score, win_score)
 
             # 5. Phonetisches Matching

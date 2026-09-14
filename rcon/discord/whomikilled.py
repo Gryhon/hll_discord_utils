@@ -2,11 +2,9 @@ import discord
 import logging
 import asyncio
 import rcon.rcon as rcon
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
-from discord import app_commands
-from datetime import datetime
-from rcon.discord.discordutils import safe_Send, has_Allowed_Role
+from rcon.discord.discordutils import safe_Send, has_Allowed_Role, build_Match_Stats_View, build_Not_Ingame_View
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +20,6 @@ class WhomIKilled (commands.Cog, DiscordBase):
         while not self.shutdown_event.is_set():
             await asyncio.sleep (5)
 
-    @app_commands.command(name="whom_i_killed", description="Shows whom you killed")
     async def whom_i_killed(self, interaction: discord.Interaction):
         try:
             if not isinstance(interaction.user, discord.Member):
@@ -68,43 +65,34 @@ class WhomIKilled (commands.Cog, DiscordBase):
 
                             if action == "KILL" and myself == ingame_name:
                                 weapon = log_items.get_LogItem(i, "weapon")
-                                kills.append((victim, weapon))
+                                victim_id = log_items.get_LogItem(i, "player2_id")
+                                kills.append((victim, weapon, victim_id))
 
                             if len(kills) >= 7:
                                 break
 
                         color = discord.Color.green() if kills else discord.Color.orange()
 
-                        stats = discord.Embed(
-                            title="Whom I killed?",
-                            description="💪 Mate, try harder, no kills." if not kills else "",
-                            color=color,
+                        view = build_Match_Stats_View(
+                            title=f"⚔️ Whom I Killed — {ingame_name}",
+                            accent=color,
+                            subtitle=None if kills else "💪 Mate, try harder, no kills.",
+                            stats=[
+                                ("⚔️", "Kills", live_stats.get_PlayerStats(player_id, "kills")),
+                                ("🤝", "TK", live_stats.get_PlayerStats(player_id, "teamkills")),
+                                ("📊", "K/D Ratio", live_stats.get_PlayerStats(player_id, "kill_death_ratio")),
+                                ("⏱️", "Kills/min", live_stats.get_PlayerStats(player_id, "kills_per_minute")),
+                                ("🔥", "Kill Streak", live_stats.get_PlayerStats(player_id, "kills_streak")),
+                            ],
+                            entries=kills,
+                            entry_icon="⚔️",
+                            empty_entries_text="-# No kills yet this match. 💪",
                         )
 
-                        stats.add_field(name="⚔️ Kills", value=live_stats.get_PlayerStats(player_id, "kills"), inline=False)
-                        stats.add_field(name="🤝 TK", value=live_stats.get_PlayerStats(player_id, "teamkills"), inline=False)
-                        stats.add_field(name="📊 K/D Ratio", value=live_stats.get_PlayerStats(player_id, "kill_death_ratio"), inline=False)
-                        stats.add_field(name="⏱️ Kills/min", value=live_stats.get_PlayerStats(player_id, "kills_per_minute"), inline=False)
-                        stats.add_field(name="🔥 Kill Streak", value=live_stats.get_PlayerStats(player_id, "kills_streak"), inline=False)
-
-                        if kills:
-                            stats.add_field(name="", value="─" * 30, inline=False)
-
-                            for no, (victim, weapon) in enumerate(kills, start=1):
-                                victim_display = (victim[:12] + "…") if len(victim) > 13 else victim
-                                stats.add_field(
-                                    name=f"⚔️ #{no} — {victim_display} ({weapon})",
-                                    value="",
-                                    inline=False,
-                                )
-
-                        stats.set_footer(text="(Provided by Gryhon)")
-                        stats.timestamp = datetime.now()
-
-                        await interaction.followup.send(embed=stats, ephemeral=True)           
+                        await interaction.followup.send(view=view, ephemeral=True)
 
                     else:
-                        await safe_Send(interaction, "❌ You are not ingame. Please join a server first.")
+                        await safe_Send(interaction, view=build_Not_Ingame_View())
                         logger.info(f"{interaction.user.name} is not ingame. Cannot execute punish_me command.")
                 else:
                     await safe_Send(interaction, "❌ You are not registered. Please register first.")

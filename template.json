@@ -1,19 +1,61 @@
 {
-    "config_version": 2,
+    "config_version": 3,
     "rcon": [
         {
             "api_url": "",
             "bearer_token": "",
             "discord_token": "",
+            "game": "HLL",
             "guild_id": 0,
             "log_level": "INFO",
             "server_number": 1,
             "stats_url": "",
-            "artillery_calculator": [
+            "admin_panel": [
                 {
+                    "channel_id": 0,
                     "enabled": false,
-                    "in_game_messages": true,
-                    "interval": 100
+                    "unlink_user": [
+                        {
+                            "enabled": false
+                        }
+                    ],
+                    "register_player": [
+                        {
+                            "enabled": false
+                        }
+                    ],
+                    "comfort_functions": [
+                        {
+                            "dryrun": false,
+                            "enabled": false,
+                            "after_game_message": [
+                                {
+                                    "enabled": false,
+                                    "messages": [
+                                        [
+                                            "After game message here",
+                                            "Or second message here"
+                                        ]
+                                    ]
+                                }
+                            ],
+                            "auto_unban": [
+                                {
+                                    "Clan": false,
+                                    "VIP": true,
+                                    "enabled": false,
+                                    "Clans": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "broadcast_message": [
+                                {
+                                    "enabled": false
+                                }
+                            ]
+                        }
+                    ]
                 }
             ],
             "auto_level": [
@@ -25,98 +67,6 @@
                     "levelbug_enabled": true,
                     "min_level": 50,
                     "player_count": 60
-                }
-            ],
-            "comfort_functions": [
-                {
-                    "dryrun": false,
-                    "enabled": false,
-                    "after_game_message": [
-                        {
-                            "enabled": false,
-                            "messages": [
-                                [
-                                    "After game message here",
-                                    "Or second message here"
-                                ]
-                            ]
-                        }
-                    ],
-                    "auto_unban": [
-                        {
-                            "Clan": false,
-                            "VIP": true,
-                            "enabled": false,
-                            "Clans": [
-                                ""
-                            ]
-                        }
-                    ],
-                    "broadcast_message": [
-                        {
-                            "enabled": false
-                        }
-                    ]
-                }
-            ],
-            "discord_commands": [
-                {
-                    "admin_always": false,
-                    "dryrun": false,
-                    "enabled": false,
-                    "groups": [
-                        ""
-                    ],
-                    "punish_me": [
-                        {
-                            "enabled": false,
-                            "groups": [
-                                ""
-                            ]
-                        }
-                    ],
-                    "remove_player_from_squad": [
-                        {
-                            "enabled": false,
-                            "groups": [
-                                ""
-                            ]
-                        }
-                    ],
-                    "switch_me": [
-                        {
-                            "enabled": false,
-                            "groups": [
-                                ""
-                            ]
-                        }
-                    ],
-                    "vip_management": [
-                        {
-                            "allow_gift_from_permanent": false,
-                            "dryrun": false,
-                            "enabled": false,
-                            "groups": [
-                                ""
-                            ]
-                        }
-                    ],
-                    "who_killed_me": [
-                        {
-                            "enabled": false,
-                            "groups": [
-                                ""
-                            ]
-                        }
-                    ],
-                    "whom_i_killed": [
-                        {
-                            "enabled": false,
-                            "groups": [
-                                ""
-                            ]
-                        }
-                    ]
                 }
             ],
             "inappropriate_name": [
@@ -145,6 +95,7 @@
             "map_vote": [
                 {
                     "activate_vote": 1,
+                    "asset_profile": "custom",
                     "audit_webhook": "",
                     "dectivate_vote": 0,
                     "dryrun": false,
@@ -187,12 +138,6 @@
                     ]
                 }
             ],
-            "register_player": [
-                {
-                    "enabled": false,
-                    "verify_ingame": false
-                }
-            ],
             "server_balance": [
                 {
                     "enabled": false,
@@ -222,6 +167,100 @@
                 {
                     "enabled": false,
                     "webhook": ""
+                }
+            ],
+            "user_panel": [
+                {
+                    "channel_id": 0,
+                    "enabled": false,
+                    "admin_always": false,
+                    "dryrun": false,
+                    "groups": [
+                        ""
+                    ],
+                    "commands": [
+                        {
+                            "gift_vip": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "player_stats": [
+                                {
+                                    "enabled": false
+                                }
+                            ],
+                            "punish_me": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "remove_player_from_squad": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "switch_me": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "unlink_me": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "vip_management": [
+                                {
+                                    "allow_gift_from_permanent": false,
+                                    "dryrun": false,
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "vip_status": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "who_killed_me": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ],
+                            "whom_i_killed": [
+                                {
+                                    "enabled": false,
+                                    "groups": [
+                                        ""
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
                 }
             ]
         }

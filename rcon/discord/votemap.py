@@ -12,14 +12,30 @@ from typing import List
 from dateutil.parser import parse
 from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
-from discord import app_commands
 from lib.config import config
 from datetime import timedelta, datetime, timezone
 from pathlib import Path
 
-_HLL_ACTIVE = Path(__file__).resolve().parent.parent.parent / "Assets" / "MapVote_active.png"
-_HLL_PAUSE  = Path(__file__).resolve().parent.parent.parent / "Assets" / "MapVote_pause.png"
-_HLL_ADMIN  = Path(__file__).resolve().parent.parent.parent / "Assets" / "MapVote_admin.png"
+ASSETS_ROOT = Path(__file__).resolve().parent.parent.parent / "Assets"
+
+
+def get_Map_Vote_Assets():
+    """Resolves the map vote badge image paths based on rcon.map_vote.asset_profile
+    ("HLL", "HLLV", or "custom"). "custom" uses Assets/ directly with no prefix; "HLL"
+    and "HLLV" use their own subfolder with a matching filename prefix."""
+    profile = config.get("rcon", 0, "map_vote", 0, "asset_profile", default="custom")
+    if profile == "HLL":
+        folder, prefix = ASSETS_ROOT / "HLL", "MapVote_HLL_"
+    elif profile == "HLLV":
+        folder, prefix = ASSETS_ROOT / "HLLV", "MapVote_HLLV_"
+    else:
+        folder, prefix = ASSETS_ROOT, "MapVote_"
+    return {
+        "active": folder / f"{prefix}active.png",
+        "pause": folder / f"{prefix}pause.png",
+        "admin": folder / f"{prefix}admin.png",
+    }
+
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -68,7 +84,7 @@ class VoteMap(commands.Cog, DiscordBase):
         self.winning_map = None
         self.winning_map_is_random = False
 
-    def _time_to_discord_ts(self, time_str: str, must_be_future: bool = False) -> int:
+    def time_To_Discord_Ts(self, time_str: str, must_be_future: bool = False) -> int:
         now = datetime.now()
         if time_str == "24:00":
             dt = datetime(now.year, now.month, now.day) + timedelta(days=1)
@@ -81,6 +97,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
     async def send_Pause_Message (self, off_ts: int = None, on_ts: int = None, user: discord.User = None):
         try:
+            assets = get_Map_Vote_Assets()
             if off_ts and on_ts:
                 embed = discord.Embed(
                     title="⏸️  Map Vote — Paused",
@@ -92,7 +109,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     timestamp=datetime.now(timezone.utc),
                 )
                 embed.add_field(name="▶️  Resumes at", value=f"<t:{on_ts}:t>\n<t:{on_ts}:R>", inline=True)
-                file = discord.File(_HLL_PAUSE, filename="MapVote_pause.png")
+                file = discord.File(assets["pause"], filename="MapVote_pause.png")
                 embed.set_image(url="attachment://MapVote_pause.png")
             else:
                 embed = discord.Embed(
@@ -104,7 +121,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     color=discord.Color.red(),
                     timestamp=datetime.now(timezone.utc),
                 )
-                file = discord.File(_HLL_ADMIN, filename="MapVote_admin.png")
+                file = discord.File(assets["admin"], filename="MapVote_admin.png")
                 embed.set_image(url="attachment://MapVote_admin.png")
             
             embed.set_footer(text="(Provided by Gryhon)")
@@ -130,7 +147,7 @@ class VoteMap(commands.Cog, DiscordBase):
             )
             embed.set_image(url="attachment://MapVote_active.png")
             embed.set_footer(text="(Provided by Gryhon)")
-            file = discord.File(_HLL_ACTIVE, filename="MapVote_active.png")
+            file = discord.File(get_Map_Vote_Assets()["active"], filename="MapVote_active.png")
             self.seeding_msg = await self.vote_channel.send(embed=embed, file=file)
             logger.info ("Server is seeding message ID: " + str (self.seeding_msg.id))
 
@@ -441,7 +458,7 @@ class VoteMap(commands.Cog, DiscordBase):
             if self.scheduler_messager != None and not self.scheduler_invalid:
                 profile = self.scheduler_messager.get_value ("profile")
 
-                map_pool = config.get_node ("rcon", 0, "map_vote", 0, "map_pool", default=[])
+                map_pool = config.getcreate_Node ("rcon", 0, "map_vote", 0, "map_pool", default=[])
 
                 if len (map_pool) > 0:
                     for i, p in enumerate(map_pool):
@@ -836,7 +853,7 @@ class VoteMap(commands.Cog, DiscordBase):
 
     async def prepare_scheduler(self):
         try:
-            shedule = config.get_node ("rcon", 0, "map_vote", 0, "schedule", default=None)
+            shedule = config.getcreate_Node ("rcon", 0, "map_vote", 0, "schedule", default=None)
 
             logger.info (f"{shedule}")
 
@@ -853,7 +870,7 @@ class VoteMap(commands.Cog, DiscordBase):
                     self.scheduler_invalid = False
 
                 if not self.scheduler_invalid:
-                    timeline = await self.generate_Schedule_Log(self.scheduler_messager.get_timeline ())
+                    timeline = await self.generate_Schedule_Log(self.scheduler_messager.getget_Timeline ())
 
                     for line in timeline:
                         logger.info(f"Schedule on {line}")      
@@ -888,8 +905,8 @@ class VoteMap(commands.Cog, DiscordBase):
                     await self.clear_All_Messages (None, False)
                     window = self.scheduler_messager.get_current_window_times ()
 
-                    off_ts = self._time_to_discord_ts(window[0])
-                    on_ts  = self._time_to_discord_ts(window[1], must_be_future=True)
+                    off_ts = self.time_To_Discord_Ts(window[0])
+                    on_ts  = self.time_To_Discord_Ts(window[1], must_be_future=True)
 
                     await self.send_Pause_Message (off_ts=off_ts, on_ts=on_ts)
 
@@ -931,13 +948,8 @@ class VoteMap(commands.Cog, DiscordBase):
         except asyncio.CancelledError:
             logger.info ("Vote map is being stopped...")  
 
-    @app_commands.command(name="map_vote", description="Manage the map vote")
-    @app_commands.describe(action="Choose an action for the map vote")
-    @app_commands.choices(action=[
-        app_commands.Choice(name="resume", value="resume"),
-        app_commands.Choice(name="pause", value="pause"),
-        app_commands.Choice(name="status", value="status"),
-    ])
+    # --- Entry point (called from the admin panel, see adminpanel.py) ---
+
     async def mapvote_command(self, interaction: discord.Interaction, action: str):
 
         if action == "pause" and self.vote_map_active:

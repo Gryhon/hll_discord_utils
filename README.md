@@ -38,7 +38,6 @@ CRCON is mainly designed and developed for PC gamers. For example, it is not pos
   - [Server Status](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#Server-Status)
   - [Map Rotation](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#map-rotation)
   - [Comfort](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#comfort)
-  - [Artillery Calculator](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#artillery-calculator)
   - [Player Registration](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#player-registration)
   - [Inappropriate Name Detection](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#inappropriate-name-detection)
   - [Discord User Commands](https://github.com/Gryhon/hll_discord_utils/wiki/Features/#discord-user-commands)

@@ -3,7 +3,7 @@ import shutil
 
 logger = logging.getLogger(__name__)
 
-CURRENT_VERSION = 2
+CURRENT_VERSION = 3
 
 
 # ─── Migration functions ───────────────────────────────────────────────────────
@@ -121,10 +121,116 @@ def migrate_v1_to_v2(cfg: dict) -> dict:
     return cfg
 
 
+USER_PANEL_COMMAND_KEYS = (
+    "gift_vip", "player_stats", "punish_me", "remove_player_from_squad", "switch_me",
+    "unlink_me", "vip_management", "vip_status", "who_killed_me", "whom_i_killed",
+)
+
+
+def migrate_v2_to_v3(cfg: dict) -> dict:
+    """
+    v2 → v3:
+    - user_menu renamed to user_panel (matches admin_panel naming)
+    - discord_commands merged into user_panel.commands — all of its commands only ever run
+      through the user panel, so they belong under the same node, grouped in their own
+      sub-node rather than as loose siblings of user_panel's own settings (channel_id,
+      enabled, groups, ...). Its own "enabled" flag is dropped: user_panel.enabled is now
+      the single switch for both the panel and whether its command cogs load — each
+      individual command still has its own "enabled" for per-command granularity.
+    - comfort_functions moved into admin_panel.comfort_functions (broadcast_message is
+      surfaced in the admin panel UI; after_game_message/auto_unban just travel along with
+      it, unchanged, as their own independent "enabled" switch).
+    - register_player moved into admin_panel.register_player, unchanged, own "enabled".
+    - map_rotation_vote: new section for the automated map-rotation vote feature.
+    """
+    for server in cfg.get("rcon", []):
+        # user_menu/discord_commands → user_panel (+ nested commands sub-node)
+        if "user_menu" in server:
+            server["user_panel"] = server.pop("user_menu")
+            logger.info("Migration v2→v3: renamed user_menu to user_panel")
+
+        if "user_panel" not in server:
+            server["user_panel"] = [{"channel_id": 0, "enabled": False}]
+            logger.info("Migration v2→v3: added user_panel")
+
+        user_panel = server["user_panel"][0]
+        user_panel.pop("commands_enabled", None)
+
+        commands_list = server.pop("discord_commands", None)
+        commands_source = commands_list[0] if commands_list else {}
+
+        # Already-flat user_panel (from an earlier, uncommitted v3 shape) — regroup in place.
+        commands_source.update({
+            key: user_panel.pop(key) for key in USER_PANEL_COMMAND_KEYS if key in user_panel
+        })
+
+        commands_source.pop("enabled", None)
+        for shared_key in ("admin_always", "dryrun", "groups"):
+            if shared_key in commands_source:
+                user_panel.setdefault(shared_key, commands_source.pop(shared_key))
+
+        if commands_source:
+            target = (user_panel.get("commands") or [{}])[0]
+            for key, value in commands_source.items():
+                target.setdefault(key, value)
+            user_panel["commands"] = [target]
+            logger.info("Migration v2→v3: merged discord_commands into user_panel.commands")
+
+        # comfort_functions → admin_panel.comfort_functions (kept as its own, independent
+        # sub-node — its "enabled" flag stays distinct from admin_panel's own, since
+        # after_game_message/auto_unban run automatically in the background regardless of
+        # whether the admin panel UI itself is enabled)
+        comfort_list = server.pop("comfort_functions", None)
+        if comfort_list:
+            if "admin_panel" not in server:
+                server["admin_panel"] = [{"channel_id": 0, "enabled": False}]
+                logger.info("Migration v2→v3: added admin_panel")
+            admin_panel = server["admin_panel"][0]
+            admin_panel.setdefault("comfort_functions", comfort_list)
+            logger.info("Migration v2→v3: moved comfort_functions into admin_panel")
+
+        # register_player → admin_panel.register_player
+        register_player_list = server.pop("register_player", None)
+        if register_player_list:
+            if "admin_panel" not in server:
+                server["admin_panel"] = [{"channel_id": 0, "enabled": False}]
+                logger.info("Migration v2→v3: added admin_panel")
+            admin_panel = server["admin_panel"][0]
+            admin_panel.setdefault("register_player", register_player_list)
+            logger.info("Migration v2→v3: moved register_player into admin_panel")
+
+        # map_rotation_vote: new section
+        if "map_rotation_vote" not in server:
+            server["map_rotation_vote"] = [{
+                "enabled": False,
+                "dryrun": False,
+                "vote_channel_id": 0,
+                "duration_days": 7,
+                "duration_hours": 0,
+                "top_maps_to_set": 10,
+                "reminder_interval_hours": 24,
+                "max_reminders_per_game": 1,
+                "stealth_vote": False,
+                "maps_per_poll": 10,
+                "map_pool": [{
+                    "dusk": 0,
+                    "overcast": 0,
+                    "night": 0,
+                    "battle_mode": [],
+                    "enforced_maps": [],
+                    "blacklist_maps": []
+                }]
+            }]
+            logger.info("Migration v2→v3: added map_rotation_vote")
+
+    return cfg
+
+
 # ─── Registry ─────────────────────────────────────────────────────────────────
 
 MIGRATIONS: dict = {
     1: migrate_v1_to_v2,
+    2: migrate_v2_to_v3,
 }
 
 

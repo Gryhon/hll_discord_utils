@@ -8,7 +8,6 @@ from rcon.discord.discordbase import DiscordBase
 from lib.config import config
 from datetime import datetime
 from discord.ext import commands
-from discord import app_commands
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -126,15 +125,10 @@ class AutoLevel (commands.Cog, DiscordBase):
 
             await asyncio.sleep (5)
 
-    @app_commands.command(name="level_cap", description="Adaptive Level Cap")
-    @app_commands.describe(action="Choose an action for the map vote")
-    @app_commands.choices(action=[
-        app_commands.Choice(name="pause", value="pause"),
-        app_commands.Choice(name="resume", value="resume"),
-        app_commands.Choice(name="status", value="status"),
-    ])
+    # --- Entry point (called from the admin panel, see adminpanel.py) ---
+
     async def level_cap_command(self, interaction: discord.Interaction, action: str):
-        
+
         if action == "pause":
             logger.info (f"Adaptive level cap paused by {interaction.user.name}!")    
             await interaction.response.send_message(f"Adaptive level cap paused by {interaction.user.name}!")

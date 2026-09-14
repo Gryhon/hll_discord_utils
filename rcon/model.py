@@ -335,40 +335,42 @@ class InGamePlayers ():
                 squad = J_XPath.get_Parent (f'//players[player_id = "{player_id}"]/..', self.json)
                 fraction = J_XPath.get_Parent (f'//players[player_id = "{player_id}"]/../../..', self.json)
 
-                if len (squad) >= 1:
+                if squad and len (squad) >= 1:
                     ret1 = squad[0]
                 else:
                     ret1 = None
 
-                if len (fraction) >= 1:
+                if fraction and len (fraction) >= 1:
                     ret2 = fraction[0]
                 else:
                     ret2 = None
-                
+
                 return ret2, ret1
             else:
-                logger.error(f"No Json data")    
+                logger.error(f"No Json data")
+                return None, None
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
-            return None
-        
+            return None, None
+
     def get_Squad_Members (self, fraction, squad):
         try:
             if self.json:
-                player_ids = J_XPath.get_Match (f'//{fraction}/squads/{squad}/players/player_id', self.json)
+                player_ids = J_XPath.get_Match (f'//{fraction}/squads/{squad}/players/player_id', self.json, "Not Found")
 
                 if player_ids != "Not Found":
                     return player_ids
                 else:
-                    return None, None
+                    return None
             else:
-                logger.error(f"No Json data")    
+                logger.error(f"No Json data")
+                return None
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
             return None
-        
+
     def is_Player_Ingame (self, player_id):
         result = self.get_Ingame_Player_Level (player_id)
 

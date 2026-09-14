@@ -2,10 +2,9 @@ import discord
 import logging
 import asyncio
 import rcon.rcon as rcon
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
-from discord import app_commands
-from rcon.discord.discordutils import safe_Send, has_Allowed_Role
+from rcon.discord.discordutils import safe_Send, has_Allowed_Role, build_Not_Ingame_View, is_User_Panel_Dryrun
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,6 @@ class PunishMe (commands.Cog, DiscordBase):
         while not self.shutdown_event.is_set():
             await asyncio.sleep (5)
     
-    @app_commands.command(name="punish_me", description="Will punish you in game to avoid additional cooldown")
     async def punish_me(self, interaction: discord.Interaction):
         try:
             if not isinstance(interaction.user, discord.Member):
@@ -42,12 +40,16 @@ class PunishMe (commands.Cog, DiscordBase):
                          
                         data = {"player_id": str (player_id), "player_name": str(ingame.get_Ingame_Player_Name (player_id)), "reason": "Because you said so! (Respawn)"}
 
-                        await rcon.Punish_Player(data)
-                        await safe_Send(interaction, "✅ done")
+                        if not is_User_Panel_Dryrun():
+                            await rcon.Punish_Player(data)
+                            logger.info(f"Punish player {player_id} ({data['player_id']}) by {interaction.user.name}.")
+                        else:
+                            logger.info(f"DryRun - Punish player {player_id} ({data['player_id']}) by {interaction.user.name} - not punished.")
 
-                        logger.info(f"Punish player {player_id} ({data['player_id']}) by {interaction.user.name}.")
+                        if not interaction.response.is_done():
+                            await interaction.response.defer()
                     else:
-                        await safe_Send(interaction, "❌ You are not ingame. Please join a server first.")
+                        await safe_Send(interaction, view=build_Not_Ingame_View())
                         logger.info(f"{interaction.user.name} is not ingame. Cannot execute punish_me command.")
                 else:
                     await safe_Send(interaction, "❌ You are not registered. Please register first.")

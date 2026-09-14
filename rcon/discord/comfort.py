@@ -6,11 +6,12 @@ import time
 import rcon.model as model
 import rcon.rcon as rcon
 from typing import List
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from lib.config import config
 from discord.ext import commands
 from discord import app_commands
 from datetime import datetime, timedelta
+from rcon.discord.discordutils import get_Faction_Names
 
 
 # get Logger for this modul
@@ -79,7 +80,7 @@ class AfterGameMessage (commands.Cog, DiscordBase):
 
                 logger.info ("Game ended, sending after game message...")
 
-                messages = config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "messages", default=[])
+                messages = config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "after_game_message", 0, "messages", default=[])
                 after_game_message = random.choice(messages) if messages else ""
 
                 if after_game_message:
@@ -88,7 +89,7 @@ class AfterGameMessage (commands.Cog, DiscordBase):
                     for player in players.players: 
                         payload = {"player_id": str (player.player_id) , "message": str (after_game_message)}   
 
-                        if not (config.get("rcon", 0, "comfort_functions", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "comfort_functions", 0, "probands"):
+                        if not (config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "dryrun")) or player.player_id in config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "probands"):
                             logger.info("After game message: " + str (payload)) 
                             await rcon.send_Player_Message (payload)
                         else:
@@ -131,7 +132,7 @@ class BroadcastMessage (commands.Cog, DiscordBase):
 
                 payload = {"player_id": str (player_id) , "message": str (message) }   
 
-                if not (config.get("rcon", 0, "comfort_functions", 0, "dryrun")) or player_id in config.get("rcon", 0, "comfort_functions", 0, "probands"):
+                if not (config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "dryrun")) or player_id in config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "probands"):
                     logger.debug("Vote message: " + str (payload)) 
                     await rcon.send_Player_Message (payload)
                 else:
@@ -145,28 +146,26 @@ class BroadcastMessage (commands.Cog, DiscordBase):
         while not self.shutdown_event.is_set():
             await asyncio.sleep (5)
             
-    @app_commands.command(name="broadcast_message", description="Broadcast message to players")
-    @app_commands.describe(
-        fraction="Choose the target audience",
-        action="Choose a message you would like to broadcast",
-        free_text="Provide your custom message (only for 'Free text' option)"
-    )
-    @app_commands.choices(fraction=[
-        app_commands.Choice(name="Axis", value="axis"),
-        app_commands.Choice(name="Allies", value="allies"),
-        app_commands.Choice(name="Both fractions", value="both"),
-    ])
-    @app_commands.choices(action=[
+    # --- Entry point (called from the admin panel, see adminpanel.py) ---
+
+    @property
+    def FRACTIONS(self):
+        names = get_Faction_Names()
+        return [
+            app_commands.Choice(name=names["axis"], value="axis"),
+            app_commands.Choice(name=names["allies"], value="allies"),
+            app_commands.Choice(name="Both fractions", value="both"),
+        ]
+
+    ACTIONS = [
         app_commands.Choice(name="Balance", value="balance"),
         app_commands.Choice(name="The server will be closed after this game", value="shutdown"),
         app_commands.Choice(name="Only fight over the 3rd objective while seeding", value="seeding1"),
         app_commands.Choice(name="No garrisons beyond zones E and F may be destroyed", value="seeding2"),
         app_commands.Choice(name="Free text", value="text"),
-    ])
-    async def broadcast_message(self, interaction: discord.Interaction, fraction: app_commands.Choice[str], action: app_commands.Choice[str], free_text: str = None):
-        fraction_value = fraction.value
-        action_value = action.value
+    ]
 
+    async def broadcast_message(self, interaction: discord.Interaction, fraction_value: str, action_value: str, free_text: str = None):
         message = None
 
         if action_value == "balance":

@@ -10,16 +10,17 @@ from rcon.discord.balance import Balance
 from rcon.discord.votemap import VoteMap
 from rcon.discord.autolevel import AutoLevel
 from rcon.discord.comfort import BroadcastMessage, AfterGameMessage, AutoUnban
-from rcon.discord.artillerycalculator import ArtilleryCalculator
-from rcon.discord.registration import Registration
 from rcon.discord.unregister import Unregister
 from rcon.discord.inappropriate import Inappropriate
 from rcon.discord.whokilledme import WhoKilledMe
-from rcon.discord.whomikilled import WhomIKilled 
+from rcon.discord.whomikilled import WhomIKilled
 from rcon.discord.switchme import SwitchMe
 from rcon.discord.punishme import PunishMe
 from rcon.discord.removeplayerfromsquad import RemovePlayerFromSquad
 from rcon.discord.vip import VipManagement
+from rcon.discord.statistics import Statistics
+from rcon.discord.userpanel import UserPanel
+from rcon.discord.adminpanel import AdminPanel
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -69,52 +70,54 @@ class MainBot(commands.Bot):
             logger.info ("Start auto level")
             await self.add_cog(AutoLevel(self)) 
 
-        if (config.get("rcon", 0, "comfort_functions", 0, "enabled")):
+        if (config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "enabled")):
             logger.info ("Start comfort functions")
 
-            if (config.get("rcon", 0, "comfort_functions", 0, "after_game_message", 0, "enabled")):
+            if (config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "after_game_message", 0, "enabled")):
                 await self.add_cog(AfterGameMessage(self))
 
-            if (config.get("rcon", 0, "comfort_functions", 0, "broadcast_message", 0, "enabled")):
+            if (config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "broadcast_message", 0, "enabled")):
                 await self.add_cog(BroadcastMessage(self))
 
-            if (config.get("rcon", 0, "comfort_functions", 0, "auto_unban", 0, "enabled")):
+            if (config.get("rcon", 0, "admin_panel", 0, "comfort_functions", 0, "auto_unban", 0, "enabled")):
                 await self.add_cog(AutoUnban(self))
 
-        if (config.get("rcon", 0, "register_player", 0, "enabled")):
+        if (config.get("rcon", 0, "admin_panel", 0, "register_player", 0, "enabled")):
             logger.info ("Start registration functions")
-            
-            await self.add_cog(Registration(self))
             await self.add_cog(Unregister(self))
 
-        if (config.get("rcon", 0, "artillery_calculator", 0, "enabled")):
-            logger.info ("Start auto artillery calculator")
-            await self.add_cog(ArtilleryCalculator(self))  
+        if (config.get("rcon", 0, "user_panel", 0, "enabled")):
+            logger.info ("Start user menu")
+            await self.add_cog(UserPanel(self))
 
-        if (config.get("rcon", 0, "discord_commands", 0, "enabled")):
-            logger.info ("Start registration functions")
-            
-            if (config.get("rcon", 0, "discord_commands", 0, "punish_me", 0, "enabled")):
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "punish_me", 0, "enabled")):
                 await self.add_cog(PunishMe(self))
 
-            if (config.get("rcon", 0, "discord_commands", 0, "switch_me", 0, "enabled")):
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "switch_me", 0, "enabled")):
                 await self.add_cog(SwitchMe(self))
 
-            if (config.get("rcon", 0, "discord_commands", 0, "who_killed_me", 0, "enabled")):      
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "who_killed_me", 0, "enabled")):
                 await self.add_cog(WhoKilledMe(self))
 
-            if (config.get("rcon", 0, "discord_commands", 0, "whom_i_killed", 0, "enabled")):      
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "whom_i_killed", 0, "enabled")):
                 await self.add_cog(WhomIKilled(self))
 
-            if (config.get("rcon", 0, "discord_commands", 0, "remove_player_from_squad", 0, "enabled")):
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "remove_player_from_squad", 0, "enabled")):
                 await self.add_cog(RemovePlayerFromSquad(self))
 
-            if (config.get("rcon", 0, "discord_commands", 0, "vip_management", 0, "enabled")):
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "vip_management", 0, "enabled")):
                 await self.add_cog(VipManagement(self))
+
+            if (config.get("rcon", 0, "user_panel", 0, "commands", 0, "player_stats", 0, "enabled")):
+                await self.add_cog(Statistics(self))
 
         if (config.get("rcon", 0, "inappropriate_name", 0, "enabled")):
             logger.info ("Start inappropriate name")
             await self.add_cog(Inappropriate(self))
+
+        if (config.get("rcon", 0, "admin_panel", 0, "enabled")):
+            logger.info ("Start admin panel")
+            await self.add_cog(AdminPanel(self))
 
     def run_bot(self):
         token = config.get("rcon", 0, "discord_token")
@@ -122,7 +125,19 @@ class MainBot(commands.Bot):
         self.run(token)
 
     def shutdown_bot(self):
-        asyncio.run_coroutine_threadsafe(self.close(), self.loop)
+        async def shutdown():
+            user_menu = self.get_cog("UserPanel")
+            if user_menu is not None:
+                await user_menu.close_All_Open_Menus()
+                await user_menu.close_Root_Message()
+
+            admin_panel = self.get_cog("AdminPanel")
+            if admin_panel is not None:
+                await admin_panel.close_Root_Message()
+
+            await self.close()
+
+        asyncio.run_coroutine_threadsafe(shutdown(), self.loop)
 
 bot = None
 bot_thread = None

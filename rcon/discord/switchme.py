@@ -2,10 +2,9 @@ import discord
 import logging
 import asyncio
 import rcon.rcon as rcon
-from rcon.discord.discordbase import DiscordBase 
+from rcon.discord.discordbase import DiscordBase
 from discord.ext import commands
-from discord import app_commands
-from rcon.discord.discordutils import safe_Send, has_Allowed_Role
+from rcon.discord.discordutils import safe_Send, has_Allowed_Role, build_Not_Ingame_View, is_User_Panel_Dryrun
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +20,15 @@ class SwitchMe (commands.Cog, DiscordBase):
         while not self.shutdown_event.is_set():
             await asyncio.sleep (5)
 
-    @app_commands.command(name="switch_me", description="Will switch you on the other team")
     async def switch_me(self, interaction: discord.Interaction):
         try:
             if not isinstance(interaction.user, discord.Member):
                 await safe_Send(interaction, "❌ This command only works on the server.")
                 logger.info(f"{interaction.user} used command outside the server.")
 
-            elif not has_Allowed_Role(interaction.user, "punish_me"):
+            elif not has_Allowed_Role(interaction.user, "switch_me"):
                 await safe_Send(interaction, "❌ You do not have permission for this command.")
-                logger.info(f"{interaction.user} does not have permission to use punish_me command.")
+                logger.info(f"{interaction.user} does not have permission to use switch_me command.")
 
             else:
                 player_id, _, _, _, _ = self.select_T17_Voter_Registration (interaction.user.id)
@@ -42,12 +40,16 @@ class SwitchMe (commands.Cog, DiscordBase):
                          
                         data = {"player_id": str(player_id)}
 
-                        await rcon.Switch_Player_Now(data)
-                        await safe_Send(interaction, "✅ done")
+                        if not is_User_Panel_Dryrun():
+                            await rcon.Switch_Player_Now(data)
+                            logger.info(f"Switch player {player_id} ({data['player_id']}) by {interaction.user.name}.")
+                        else:
+                            logger.info(f"DryRun - Switch player {player_id} ({data['player_id']}) by {interaction.user.name} - not switched.")
 
-                        logger.info(f"Switch player {player_id} ({data['player_id']}) by {interaction.user.name}.")
+                        if not interaction.response.is_done():
+                            await interaction.response.defer()
                     else:
-                        await safe_Send(interaction, "❌ You are not ingame. Please join a server first.")
+                        await safe_Send(interaction, view=build_Not_Ingame_View())
                         logger.info(f"{interaction.user.name} is not ingame. Cannot execute punish_me command.")
                 else:
                     await safe_Send(interaction, "❌ You are not registered. Please register first.")

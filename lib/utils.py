@@ -5,11 +5,42 @@ import asyncio
 from lib.jsonxpath import JSONXPath
 import jmespath
 import jsonpath_ng.ext as jpath
+from jsonpath_ng import DatumInContext, Index
+from jsonpath_ng.ext.filter import Filter as JsonPathFilter
 from lib.config import config
 from datetime import datetime, time
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
+
+
+def non_Destructive_Filter_Find(self, datum):
+    """Replacement for jsonpath_ng.ext.filter.Filter.find.
+
+    The shipped implementation does `datum.value = list(datum.value.values())` for dict
+    datums, and DatumInContext's value setter writes that list straight back into the
+    parent document. A read-only query like `$..*[?(@.player_id == 'x')].role` therefore
+    rewrites the source JSON: every dict it descends into is replaced by a list of its
+    values, so keys such as "result", "axis"/"allies" and the squad names are gone for
+    every later lookup on the same object. Build the candidate list locally instead."""
+    if not self.expressions:
+        return datum
+
+    datum = DatumInContext.wrap(datum)
+    values = datum.value
+
+    if isinstance(values, dict):
+        values = list(values.values())
+
+    if not isinstance(values, list):
+        return []
+
+    return [DatumInContext(values[i], path=Index(i), context=datum)
+            for i in range(0, len(values))
+            if all(expression.find(values[i]) for expression in self.expressions)]
+
+
+JsonPathFilter.find = non_Destructive_Filter_Find
 
 async def get_Data_from_Url(url, token, payload=None, retries=3, backoff_delays=(1, 2, 3)):
     headers = {
@@ -139,13 +170,13 @@ class ScheduleManager():
         self.schedule = schedule
 
     @staticmethod
-    def _parse_time(s: str) -> time | None:
+    def parse_Time(s: str) -> time | None:
         try:
             return datetime.strptime(s, "%H:%M").time()
         except Exception:
             return None
 
-    def _normalize(self):
+    def normalize(self):
         errors: list[str] = []
         parsed_entries: list[dict] = []
 
@@ -167,8 +198,8 @@ class ScheduleManager():
             if invalid_days:
                 errors.append(f"Entry {idx}: invalid day codes {invalid_days}")
 
-            on_t = self._parse_time(on_s)
-            off_t = self._parse_time(off_s) if off_s else None
+            on_t = self.parse_Time(on_s)
+            off_t = self.parse_Time(off_s) if off_s else None
             has_null_off = off_s is None
 
             if on_t is None:
@@ -262,7 +293,7 @@ class ScheduleManager():
         return normalized, errors
 
     def validate(self) -> list[str]:
-        normalized, errors = self._normalize()
+        normalized, errors = self.normalize()
 
         def to_min(t: time) -> int:
             return t.hour * 60 + t.minute
@@ -306,7 +337,7 @@ class ScheduleManager():
         curr_day = self.VALID_DAYS[now.weekday()]
         now_t = now.time()
 
-        normalized, _ = self._normalize()
+        normalized, _ = self.normalize()
 
         for item in normalized:
             if curr_day not in item["days"]:
@@ -327,7 +358,7 @@ class ScheduleManager():
             now = datetime.now()
         curr_day = self.VALID_DAYS[now.weekday()]
         now_t = now.time()
-        normalized, _ = self._normalize()
+        normalized, _ = self.normalize()
 
         for item in normalized:
             if curr_day not in item["days"]:
@@ -347,8 +378,8 @@ class ScheduleManager():
             return None
         return active.get(field)
 
-    def get_timeline(self, with_bars: bool = False) -> dict[str, list[tuple[str, str, str]]]:
-        normalized, _ = self._normalize()
+    def getget_Timeline(self, with_bars: bool = False) -> dict[str, list[tuple[str, str, str]]]:
+        normalized, _ = self.normalize()
 
         def to_min(t: time) -> int:
             return t.hour * 60 + t.minute
@@ -397,11 +428,11 @@ class ScheduleManager():
             timeline[d] = [tuple(s) for s in merged]
 
         if with_bars:
-            self._print_bars(timeline)
+            self.print_Bars(timeline)
 
         return timeline
 
-    def _print_bars(self, timeline: dict[str, list[tuple[str, str, str]]], width: int = 48):
+    def print_Bars(self, timeline: dict[str, list[tuple[str, str, str]]], width: int = 48):
         scale = 1440 / width
         print("\nZeitplan (ASCII-Balken):")
         for d in self.VALID_DAYS:
@@ -419,7 +450,7 @@ class ScheduleManager():
         curr_day = self.VALID_DAYS[now.weekday()]
         now_t = now.time()
 
-        normalized, _ = self._normalize()
+        normalized, _ = self.normalize()
 
         # collect all slots of the current day
         slots = [item for item in normalized if curr_day in item["days"]]

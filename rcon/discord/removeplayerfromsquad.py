@@ -2,21 +2,80 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Sequence
 
 import discord
-from discord import app_commands
 from discord.ext import commands
 
 import rcon.model as model
 import rcon.rcon as rcon
 from lib.config import config
 from rcon.discord.discordbase import DiscordBase
-from rcon.discord.discordutils import has_Allowed_Role, safe_Send
+from rcon.discord.discordutils import has_Allowed_Role, safe_Send, build_Not_Ingame_View, is_User_Panel_Dryrun, build_Profile_Link, add_Provided_By, PROVIDED_BY
 
 logger = logging.getLogger(__name__)
+
+FRACTION_LABELS = {
+    "axis": "Axis",
+    "allies": "Allies",
+}
+
+LEADER_ROLES = {
+    "squadleader": "Squad Leader",
+    "officer": "Officer",
+    "tankcommander": "Tank Commander",
+    "spotter": "Spotter",
+    "helicopterlogisticsofficer": "Helicopter Logistics Officer",
+    "mortarobserver": "Mortar Observer",
+}
+
+
+def build_Not_Leader_View(name: str) -> discord.ui.LayoutView:
+    """Shown instead of the squad checklist when the requester holds a role that isn't
+    allowed to remove players from a squad."""
+    allowed = "\n".join(f"- {label}" for label in LEADER_ROLES.values())
+    container = discord.ui.Container(accent_colour=discord.Color.red())
+    container.add_item(discord.ui.TextDisplay(f"### 🚫 Not a Squad Leader"))
+    container.add_item(discord.ui.Separator())
+    container.add_item(discord.ui.TextDisplay(
+        f"**{name}**, you don't hold a role that's allowed to remove players from a squad.\n\n"
+        f"-# Allowed roles:\n{allowed}"
+    ))
+    add_Provided_By(container)
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(container)
+    return view
+
+
+def build_No_Squad_Members_View(name: str, squad: Optional[str], fraction: Optional[str]) -> discord.ui.LayoutView:
+    """Shown instead of the squad checklist when the requester is the only one in their
+    squad — nothing to pick from, so this is an information card, not an error."""
+    squad_label = str(squad or "").upper()
+    fraction_label = FRACTION_LABELS.get(str(fraction or "").lower())
+
+    container = discord.ui.Container(accent_colour=discord.Color.blurple())
+    container.add_item(discord.ui.TextDisplay("### 👤 Nobody to remove"))
+    container.add_item(discord.ui.Separator())
+
+    if squad_label:
+        body = f"**{name}**, you are the only player in squad **{squad_label}** right now."
+    else:
+        body = f"**{name}**, you are currently not in a squad."
+    container.add_item(discord.ui.TextDisplay(body))
+
+    footer = "-# The list only offers your squad mates — you can't remove yourself."
+    if squad_label and fraction_label:
+        footer = f"-# {fraction_label} · Squad {squad_label}\n{footer}"
+    container.add_item(discord.ui.TextDisplay(footer))
+
+    add_Provided_By(container)
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(container)
+    return view
+
 
 @dataclass
 class ChecklistItem:
@@ -26,122 +85,12 @@ class ChecklistItem:
     level: str
     checked: bool = False
 
-class FinalConfirmView(discord.ui.View):
-    def __init__(
-        self,
-        parent_view: "NumberedChecklistView",
-        orig_interaction: discord.Interaction,
-        timeout: Optional[float] = 180.0, 
-    ):
-        super().__init__(timeout=timeout)
-        self.parent_view = parent_view
-        self.orig_inter = orig_interaction 
-        self.message: Optional[discord.Message] = None  
-
-    async def on_timeout(self) -> None:
-        for c in self.children:
-            if isinstance(c, discord.ui.Button):
-                c.disabled = True
-        try:
-            if self.message:
-                await self.message.edit(content="(Dialog abgelaufen)", view=self, embed=None)
-        except Exception:
-            pass
-
-        try:
-            self.parent_view.owner._forget_transient(self)  
-        except Exception:
-            pass
-
-    @discord.ui.button(label="Yes, remove", style=discord.ButtonStyle.danger, custom_id="rm:num:final_yes")
-    async def yes(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        if not interaction.response.is_done():
-            await interaction.response.defer(thinking=True, ephemeral=True)
-
-        error_text: Optional[str] = None
-        selected_items = self.parent_view.get_selected_items()
-        if not selected_items:
-            error_text = "❌ No players selected. Operation cancelled."
-
-        if error_text is None:
-            try:
-                await self.parent_view.owner.remove_selected_players(interaction, selected_items)
-            except Exception as ex:
-                logger.exception("remove_selected_players failed: %s", ex)
-                error_text = f"⚠️ Error while removing.: {ex}"
-
-        try:
-            await self.orig_inter.edit_original_response(view=None)
-            if self.parent_view.message:
-                self.parent_view.owner._forget_view(self.parent_view.message.id)
-        except Exception:
-            pass
-
-        try:
-            if interaction.message:
-                if error_text is None:
-                    await interaction.followup.edit_message(
-                        message_id=interaction.message.id,
-                        content="✅ Removal completed.",
-                        view=None,
-                        embed=None,
-                    )
-                else:
-                    await interaction.followup.edit_message(
-                        message_id=interaction.message.id,
-                        content=error_text,
-                        view=None,
-                        embed=None,
-                    )
-            else:
-                await interaction.followup.send(error_text or "✅ Removal completed.", ephemeral=True)
-        except Exception:
-            pass
-
-        try:
-            self.parent_view.owner._forget_transient(self)  # type: ignore[attr-defined]
-        except Exception:
-            pass
-        self.stop()
-
-    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, custom_id="rm:num:final_no")
-    async def no(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
-        if not interaction.response.is_done():
-            await interaction.response.defer(thinking=False, ephemeral=True)
-
-        for c in self.parent_view.children:
-            c.disabled = False
-
-        try:
-            await self.orig_inter.edit_original_response(view=self.parent_view)
-        except Exception:
-            pass
-
-        try:
-            if interaction.message:
-                await interaction.followup.edit_message(
-                    message_id=interaction.message.id,
-                    content="Canceled.",
-                    view=None,
-                    embed=None,
-                )
-            else:
-                await interaction.followup.send("Canceled.", ephemeral=True)
-        except Exception:
-            pass
-
-        try:
-            self.parent_view.owner._forget_transient(self) 
-        except Exception:
-            pass
-        self.stop()
-
-class _DigitButton(discord.ui.Button["NumberedChecklistView"]):
-    def __init__(self, idx: int, item: ChecklistItem):
+class DigitButton(discord.ui.Button["NumberedChecklistView"]):
+    def __init__(self, idx: int, item: ChecklistItem, instance_id: str):
         super().__init__(
             label=str(idx),
             style=discord.ButtonStyle.success if item.checked else discord.ButtonStyle.secondary,
-            custom_id=f"rm:num:{idx}:{item.id}", 
+            custom_id=f"rm:num:{instance_id}:{idx}:{item.id}",
             row=0,
         )
         self.zero_based_index = idx - 1
@@ -152,57 +101,63 @@ class _DigitButton(discord.ui.Button["NumberedChecklistView"]):
         view: NumberedChecklistView = self.view 
         await view.toggle_by_index(self.zero_based_index, interaction)
 
-class _ConfirmRemove(discord.ui.Button["NumberedChecklistView"]):
-    def __init__(self):
-        super().__init__(label="Confirm Remove", style=discord.ButtonStyle.danger, custom_id="rm:num:confirm", row=1)
+class SelectAllToggle(discord.ui.Button["NumberedChecklistView"]):
+    """Ticks every player at once — and unticks them again on a second press, so the
+    button can't strand the list in a state the member didn't intend."""
+
+    SELECT_LABEL = "Select all"
+    CLEAR_LABEL = "Clear all"
+
+    def __init__(self, instance_id: str):
+        super().__init__(label=self.SELECT_LABEL, style=discord.ButtonStyle.primary,
+                         custom_id=f"rm:num:{instance_id}:all", row=1)
+
+    def refresh(self, all_selected: bool) -> None:
+        self.label = self.CLEAR_LABEL if all_selected else self.SELECT_LABEL
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=False)
+        view: NumberedChecklistView = self.view
+        await view.toggle_All(interaction)
+
+
+class ConfirmRemove(discord.ui.Button["NumberedChecklistView"]):
+    def __init__(self, instance_id: str):
+        super().__init__(label="Confirm Remove", style=discord.ButtonStyle.danger,
+                         custom_id=f"rm:num:{instance_id}:confirm", row=1)
 
     async def callback(self, interaction: discord.Interaction) -> None:  # type: ignore[override]
+        """Removes the ticked players straight away — there is no second confirmation — and
+        closes the dialog. Only a failure is reported back, a successful removal is visible
+        in-game and stays in the log."""
         if not interaction.response.is_done():
-            await interaction.response.defer(thinking=True)
+            await interaction.response.defer(thinking=False)
 
         view: NumberedChecklistView = self.view
+        selected_items = view.get_selected_items()
 
         for c in view.children:
             c.disabled = True
+
+        await view.close()
+
+        if not selected_items:
+            try:
+                await interaction.followup.send("❌ No players selected. Nothing was removed.", ephemeral=True)
+            except Exception:
+                pass
+            return
+
         try:
-            if interaction.message:
-                await interaction.followup.edit_message(message_id=interaction.message.id, view=view)
-        except Exception:
-            pass
+            await view.owner.remove_selected_players(interaction, selected_items)
+        except Exception as ex:
+            logger.exception("remove_selected_players failed: %s", ex)
+            try:
+                await interaction.followup.send(f"⚠️ Error while removing: {ex}", ephemeral=True)
+            except Exception:
+                pass
 
-        selected_items = view.get_selected_items()
-        have_selection = bool(selected_items)
-
-        if view.double_confirm:
-            if not have_selection:
-                try:
-                    await view.disable_and_finalize(
-                        interaction,
-                        error_text="❌ No players selected. Process aborted.",
-                    )
-                except Exception:
-                    pass
-            else:
-                confirm_embed = view.build_confirm_embed(selected_items)
-                final_view = FinalConfirmView(parent_view=view, orig_interaction=view.orig_inter) 
-                m2 = await interaction.followup.send(embed=confirm_embed, view=final_view, ephemeral=True)
-                
-                try:
-                    final_view.message = m2
-                    view.owner._remember_transient(final_view) 
-                except Exception:
-                    pass
-        else:
-            if not have_selection:
-                try:
-                    await view.disable_and_finalize(
-                        interaction,
-                        error_text="❌ No players selected. Process aborted.",
-                    )
-                except Exception:
-                    pass
-            else:
-                await view.confirm(interaction)
 
 class NumberedChecklistView(discord.ui.View):
     def __init__(
@@ -212,7 +167,6 @@ class NumberedChecklistView(discord.ui.View):
         items: List[ChecklistItem],
         *,
         with_confirm: bool = True,
-        double_confirm: bool = False,
         timeout: Optional[float] = 840.0,
     ):
         super().__init__(timeout=timeout)
@@ -224,16 +178,24 @@ class NumberedChecklistView(discord.ui.View):
         self.owner = owner_cog
         self.title = title
         self.items = items
-        self.double_confirm = double_confirm
         self.message: Optional[discord.Message] = None
         self.orig_inter: Optional[discord.Interaction] = None
         self.requester_id: Optional[int] = None
+        # Unique per dialog: the buttons of two dialogs listing the same squad would
+        # otherwise carry identical custom_ids and become indistinguishable for
+        # discord.py's component dispatch.
+        self.instance_id = uuid.uuid4().hex[:8]
 
         for idx, it in enumerate(self.items, start=1):
-            self.add_item(_DigitButton(idx, it))
+            self.add_item(DigitButton(idx, it, self.instance_id))
+
+        self.select_all_button: Optional[SelectAllToggle] = None
+        if len(self.items) > 1:
+            self.select_all_button = SelectAllToggle(self.instance_id)
+            self.add_item(self.select_all_button)
 
         if with_confirm:
-            self.add_item(_ConfirmRemove())
+            self.add_item(ConfirmRemove(self.instance_id))
 
     def set_context(self, orig_inter: discord.Interaction, msg: discord.Message, requester_id: int) -> None:
         self.orig_inter = orig_inter
@@ -254,7 +216,7 @@ class NumberedChecklistView(discord.ui.View):
 
         try:
             if self.message:
-                self.owner._forget_view(self.message.id)
+                self.owner.forget_View(self.message.id)
         except Exception:
             pass
 
@@ -266,37 +228,50 @@ class NumberedChecklistView(discord.ui.View):
     def get_selected_items(self) -> List[ChecklistItem]:
         return [it for it in self.items if it.checked]
 
-    def build_confirm_embed(self, selected: List[ChecklistItem]) -> discord.Embed:
-        e = discord.Embed(
-            title="⚠️ The following players will be removed from the squad:",
-            colour=discord.Color.red(),
-        )
-        lines = []
-        for i, it in enumerate(selected, start=1):
-            lines.append(f"{i}.  **{it.name}** (Level {it.level} - _{it.role}_)")
-        e.add_field(name="\u200b", value="\n".join(lines), inline=False)
-        return e
-
     def build_embed(self) -> discord.Embed:
         e = discord.Embed(title=self.title)
         lines = []
         for i, it in enumerate(self.items, start=1):
             mark = "✅" if it.checked else "⬜"
-            lines.append(f"{i}. {mark}  **{it.name}** (Level {it.level} - _{it.role}_)")
+            lines.append(f"{i}. {mark}  **{build_Profile_Link(it.name, it.id)}** (Level {it.level} - _{it.role}_)")
         e.description = "\n".join(lines)
+        e.set_footer(text=PROVIDED_BY)
+        e.timestamp = datetime.now()
         return e
+
+    def refresh_Buttons(self) -> None:
+        """Brings every button in line with the current selection — the digit colours and
+        the label of the select-all toggle."""
+        for child in self.children:
+            if isinstance(child, DigitButton):
+                item = self.items[child.zero_based_index]
+                child.style = (
+                    discord.ButtonStyle.success if item.checked else discord.ButtonStyle.secondary
+                )
+
+        if self.select_all_button is not None:
+            self.select_all_button.refresh(all(it.checked for it in self.items))
 
     async def toggle_by_index(self, i0: int, interaction: discord.Interaction) -> None:
         if 0 <= i0 < len(self.items):
             self.items[i0].checked = not self.items[i0].checked
-            
-            for child in self.children:
-                if isinstance(child, discord.ui.Button) and child.row == 0 and child.label == str(i0 + 1):
-                    child.style = (
-                        discord.ButtonStyle.success if self.items[i0].checked else discord.ButtonStyle.secondary
-                    )
-                    break
 
+        await self.repaint(interaction)
+
+    async def toggle_All(self, interaction: discord.Interaction) -> None:
+        """Selects every player, or clears the selection when everything is already ticked."""
+        select_all = not all(it.checked for it in self.items)
+        for item in self.items:
+            item.checked = select_all
+
+        logger.info(
+            "%s %s all %d squad mates in the remove dialog.",
+            interaction.user, "selected" if select_all else "cleared", len(self.items),
+        )
+        await self.repaint(interaction)
+
+    async def repaint(self, interaction: discord.Interaction) -> None:
+        self.refresh_Buttons()
         embed = self.build_embed()
         try:
             if interaction.message:
@@ -309,59 +284,31 @@ class NumberedChecklistView(discord.ui.View):
             except Exception:
                 pass
 
-    async def disable_and_finalize(self, interaction: discord.Interaction, error_text: Optional[str] = None) -> None:
-        for c in self.children:
-            c.disabled = True
-        try:
-            if interaction.message:
-                await interaction.followup.edit_message(message_id=interaction.message.id, view=self)
-        except Exception:
-            pass
-
-        try:
-            await interaction.followup.send(error_text or "ℹ️ Process completed.", ephemeral=True)
-        except Exception:
-            pass
+    async def close(self) -> None:
+        """Takes the dialog off the screen. The checklist is the original response of the
+        slash command, so deleting that response makes the whole ephemeral message
+        disappear instead of leaving a dead list behind."""
+        self.stop()
 
         try:
             if self.orig_inter is not None:
-                await self.orig_inter.edit_original_response(view=None)
-            elif interaction.message:
-                await interaction.followup.edit_message(message_id=interaction.message.id, view=None)
-            if self.message:
-                self.owner._forget_view(self.message.id)
+                await self.orig_inter.delete_original_response()
+            elif self.message is not None:
+                await self.message.delete()
         except Exception:
-            pass
-
-    async def confirm(self, interaction: discord.Interaction) -> None:
-        selected_items = self.get_selected_items()
-        error_text: Optional[str] = None
-
-        if not selected_items:
-            error_text = "❌ No players selected. Operation aborted."
-
-        if error_text is None:
+            # Falls Discord das Loeschen verweigert: wenigstens die Buttons entfernen.
             try:
-                await self.owner.remove_selected_players(interaction, selected_items)
-            except Exception as ex:
-                logger.exception("remove_selected_players failed: %s", ex)
-                error_text = f"⚠️ Error while removing: {ex}"
-
-        try:
-            if self.orig_inter is not None:
-                await self.orig_inter.edit_original_response(view=None)
-            elif interaction.message:
-                await interaction.followup.edit_message(message_id=interaction.message.id, view=None)
-            if self.message:
-                self.owner._forget_view(self.message.id)
-        except Exception:
-            pass
-
-        if error_text is not None:
-            try:
-                await interaction.followup.send(error_text, ephemeral=True)
+                if self.orig_inter is not None:
+                    await self.orig_inter.edit_original_response(view=None)
             except Exception:
                 pass
+
+        try:
+            if self.message:
+                self.owner.forget_View(self.message.id)
+        except Exception:
+            pass
+
 
 class RemovePlayerFromSquad(commands.Cog, DiscordBase):
     def __init__(self, bot: commands.Bot):
@@ -370,33 +317,38 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
         self.bot = bot
         self.in_Loop = False
         self.loop_started = False
-        self._active_views: dict[int, discord.ui.View] = {}  
-        self._transient_views: set[discord.ui.View] = set()
+        self._active_views: dict[int, discord.ui.View] = {}
 
-    def _remember_view(self, view: discord.ui.View, msg: discord.Message) -> None:
+    def remember_View(self, view: discord.ui.View, msg: discord.Message) -> None:
         self._active_views[msg.id] = view
         try:
             setattr(view, "message", msg)
         except Exception:
             pass
 
-    def _forget_view(self, message_id: int) -> None:
+    def forget_View(self, message_id: int) -> None:
         self._active_views.pop(message_id, None)
 
-    def _remember_transient(self, view: discord.ui.View) -> None:
-        self._transient_views.add(view)
+    def cancel_Previous_Views(self, requester_id: int) -> None:
+        """Stops the dialogs this member still has open before a new one is shown. An old
+        checklist otherwise stays clickable for its whole timeout and would act on whatever
+        was ticked back then, which looks like removing a player that was never selected."""
+        for message_id, view in list(self._active_views.items()):
+            if getattr(view, "requester_id", None) != requester_id:
+                continue
 
-    def _forget_transient(self, view: discord.ui.View) -> None:
-        self._transient_views.discard(view)
+            view.stop()
+            self._active_views.pop(message_id, None)
+            logger.info("Closed an older remove dialog of %s before opening a new one.", requester_id)
 
     async def background_task(self) -> None:
         while not self.shutdown_event.is_set():
             await asyncio.sleep(5)
 
-    @app_commands.command(name="remove_player_from_squad", description="Removes a player from their squad. (SL only)")
     async def remove_player_from_squad(self, interaction: discord.Interaction) -> None:
         did_defer = False
         error_message: Optional[str] = None
+        error_view: Optional[discord.ui.LayoutView] = None
         final_embed: Optional[discord.Embed] = None
         final_view: Optional[NumberedChecklistView] = None
 
@@ -405,9 +357,9 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
                 error_message = "❌ This command only works on the server."
                 logger.info("%s used command outside the server.", interaction.user)
 
-            if error_message is None and not has_Allowed_Role(interaction.user, "remove player from squad"):
+            if error_message is None and not has_Allowed_Role(interaction.user, "remove_player_from_squad"):
                 error_message = "❌ You do not have permission for this command."
-                logger.info("%s lacks permission 'remove player from squad'.", interaction.user)
+                logger.info("%s lacks permission 'remove_player_from_squad'.", interaction.user)
 
             if error_message is None:
                 await interaction.response.defer(thinking=True, ephemeral=True)
@@ -432,12 +384,14 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
             if error_message is None and ingame:
                 if not ingame.is_Player_Ingame(player_id):
                     error_message = "❌ You are not ingame. Please join a server first."
+                    error_view = build_Not_Ingame_View()
                     logger.info("%s is not ingame.", interaction.user)
                 else:
                     ingame_name = ingame.get_Ingame_Player_Name(player_id)
                     role = ingame.get_Role(player_id)
-                    if role not in ("officer", "tankcommander", "spotter"):
+                    if role not in LEADER_ROLES:
                         error_message = f"❌ {ingame_name}, you are not a Squad Leader. Only Squad Leaders can use this command."
+                        error_view = build_Not_Leader_View(ingame_name)
                         logger.warning("Player %s is not a Squad Leader", ingame_name)
 
             items: List[ChecklistItem] = []
@@ -453,11 +407,13 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
                     items.append(ChecklistItem(id=str(pid), name=pname, role=prole, level=plevel, checked=False))
 
                 if not items:
-                    error_message = f"ℹ️ **No** other members in your squad **{(squad or '').upper()}**"
+                    error_message = f"ℹ️ No other members in your squad {str(squad or '').upper()}"
+                    error_view = build_No_Squad_Members_View(ingame_name, squad, fraction)
+                    logger.info("%s is alone in squad %s", ingame_name, squad)
 
             if error_message is None:
-                title = f"Choose the player you want to remove from {(squad or '').upper()}:"
-                final_view = NumberedChecklistView(self, title, items, with_confirm=True, double_confirm=True)
+                title = f"Choose the player you want to remove from {str(squad or '').upper()}:"
+                final_view = NumberedChecklistView(self, title, items, with_confirm=True)
                 final_embed = final_view.build_embed()
 
         except Exception as e:
@@ -466,9 +422,15 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
 
         try:
             if error_message is None and did_defer and final_view and final_embed:
+                self.cancel_Previous_Views(interaction.user.id)
                 msg = await interaction.edit_original_response(embed=final_embed, view=final_view)
                 final_view.set_context(orig_inter=interaction, msg=msg, requester_id=interaction.user.id)
-                self._remember_view(final_view, msg)
+                self.remember_View(final_view, msg)
+            elif error_view is not None:
+                if not did_defer:
+                    await safe_Send(interaction, view=error_view)
+                else:
+                    await interaction.edit_original_response(content=None, embed=None, view=error_view)
             else:
                 if not did_defer:
                     await safe_Send(interaction, error_message or "⚠️ Nothing to show.")
@@ -478,52 +440,44 @@ class RemovePlayerFromSquad(commands.Cog, DiscordBase):
             logger.exception("Failed to send response in remove_player_from_squad.")
 
     async def remove_selected_players(self, interaction: discord.Interaction, items: List[ChecklistItem]) -> None:
-        result_text: Optional[str] = None
-        try:
-            valid = [it for it in items if isinstance(it, ChecklistItem)]
+        """Removes the given players. A successful removal stays silent — the dialog is
+        already gone at this point and the result is visible in-game — only players that
+        could not be removed are reported back, so a failure can't pass unnoticed."""
+        failures: List[tuple[ChecklistItem, str]] = []
 
+        try:
             seen: set[str] = set()
             unique: List[ChecklistItem] = []
-            for it in valid:
-                if it.id not in seen:
+            for it in items:
+                if isinstance(it, ChecklistItem) and it.id not in seen:
                     unique.append(it)
                     seen.add(it.id)
 
-            successes: List[ChecklistItem] = []
-            failures: List[tuple[ChecklistItem, str]] = []
+            for it in unique:
+                try:
+                    data = {"player_id": str(it.id), "reason": "The squad leader doesn’t want you in the squad anymore."}
 
-            if unique:
-                for it in unique:
-                    try:
-                        data = {"player_id": str(it.id), "reason": "The squad leader doesn’t want you in the squad anymore."}
+                    if not is_User_Panel_Dryrun():
+                        await rcon.remove_from_squad(data)
+                        logger.info(f"Removed player: {it.name} ({it.id}) from squad, requested by {interaction.user}.")
+                    else:
+                        logger.info(f"DryRun - Removed player: {it.name} ({it.id}) from squad, requested by {interaction.user} - not removed.")
 
-                        if not (config.get("rcon", 0, "discord_commands", 0, "dryrun")):
-                            await rcon.remove_from_squad(data)
-                            logger.info ("Removed player: " + str (it.name) + " from squad!")
-                        else:
-                            logger.info ("Dry run player: " + str (it.name) + " not removed from squad!")
-
-                        successes.append(it)
-                    except Exception as ex:
-                        failures.append((it, str(ex)))
-            else:
-                result_text = "ℹ️ No valid players to remove."
-
-            if result_text is None:
-                parts: List[str] = []
-                if successes:
-                    parts.append("✅ Removed: " + ", ".join(f"{x.name} ({x.id})" for x in successes))
-                if failures:
-                    parts.append("⚠️ Failed: " + ", ".join(f"{x.name} ({x.id}) – {reason}" for x, reason in failures))
-                if not parts:
-                    parts.append("ℹ️ Nothing changed.")
-                result_text = "\n".join(parts)
+                except Exception as ex:
+                    logger.error(f"Failed to remove player {it.name} ({it.id}) from squad: {ex}")
+                    failures.append((it, str(ex)))
 
         except Exception as e:
             logger.error("Failed to remove selected players: %s", e)
-            result_text = f"⚠️ failed removing: {e}"
+            try:
+                await interaction.followup.send(f"⚠️ Error while removing: {e}", ephemeral=True)
+            except Exception:
+                pass
+            return
 
-        try:
-            await interaction.followup.send(result_text or "ℹ️ Done.", ephemeral=True)
-        except Exception:
-            pass
+        if failures:
+            text = "⚠️ Could not remove: " + ", ".join(f"{x.name} – {reason}" for x, reason in failures)
+            try:
+                await interaction.followup.send(text, ephemeral=True)
+            except Exception:
+                pass

@@ -10,6 +10,7 @@ from lib.config import config
 from datetime import datetime
 from discord.ext import commands
 from discord import app_commands
+from rcon.discord.discordutils import get_Faction_Names
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
@@ -40,7 +41,8 @@ class ServerStatus(commands.Cog, DiscordBase):
             stats.add_field(name="Next Map", value=next_map.pretty_name, inline=True)
             stats.add_field(name="Time Remaining", value=game_status.raw_time_remaining, inline=True)
             stats.add_field(name="\u200b", value="", inline=False)
-            stats.add_field(name="Allies vs Axis", value=str (game_status.num_allied_players) + " - " + str (game_status.num_axis_players), inline=True)
+            names = get_Faction_Names()
+            stats.add_field(name=f"{names['allies']} vs {names['axis']}", value=str (game_status.num_allied_players) + " - " + str (game_status.num_axis_players), inline=True)
             stats.add_field(name="Match Score", value= str (game_status.allied_score) + " - " + str (game_status.axis_score) , inline=True)
             stats.add_field(name="Total Player", value=server_status.current_players, inline=True)
             stats.set_image (url=f"{config.get("rcon", 0, "stats_url")}/maps/{current_map.image_name}")

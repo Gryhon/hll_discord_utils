@@ -603,6 +603,57 @@ class DiscordBase:
             logger.error(f"Unexpected error: {e}")
             return False
 
+    def select_Voter_Registration_Name(self, discord_user_id):
+        """Returns the best-known display name (nick, falling back to username) for a
+        registered Discord user, or None if they have no registration. Used where a
+        member object may not be resolvable (e.g. they left the server)."""
+        try:
+            self.cursor.execute(
+                '''SELECT votreg_dis_nick, votreg_dis_user
+                   FROM voter_register
+                   WHERE votreg_dis_user_id = ?
+                   ORDER BY votreg_seqno DESC
+                   LIMIT 1''',
+                (int(discord_user_id),)
+            )
+            row = self.cursor.fetchone()
+            if not row:
+                return None
+            nick, username = row
+            return nick or username
+
+        except sqlite3.OperationalError as e:
+            logger.error(f"SQLite OperationalError: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return None
+
+    def search_Voter_Registrations(self, query: str = "", limit: int = 25):
+        """Searches registered accounts by Discord nick/username or T17 id (substring,
+        case-insensitive). An empty query returns the most recently registered accounts.
+        Returns (discord_user_id, discord_nick, discord_user, t17_id, clan_tag) rows."""
+        try:
+            needle = f"%{query.strip()}%" if query.strip() else "%"
+            self.cursor.execute(
+                '''SELECT votreg_dis_user_id, votreg_dis_nick, votreg_dis_user, votreg_t17_id, votreg_clan_tag
+                   FROM voter_register
+                   WHERE votreg_dis_nick LIKE ? COLLATE NOCASE
+                      OR votreg_dis_user LIKE ? COLLATE NOCASE
+                      OR votreg_t17_id LIKE ?
+                   ORDER BY votreg_seqno DESC
+                   LIMIT ?''',
+                (needle, needle, needle, int(limit))
+            )
+            return self.cursor.fetchall()
+
+        except sqlite3.OperationalError as e:
+            logger.error(f"SQLite OperationalError: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Unexpected error: {e}")
+            return []
+
     def get_voter_reminder_preference(self, user_id):
         try:
             result = self.select_T17_Voter_Registration(user_id)

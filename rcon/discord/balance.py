@@ -9,9 +9,20 @@ from lib.config import config
 from datetime import datetime
 from discord.ext import commands
 from discord import app_commands
+from rcon.discord.discordutils import get_Faction_Names
 
 # get Logger for this modul
 logger = logging.getLogger(__name__)
+
+def center_Symmetric(text, width, nudge_right=0):
+    # The header columns line up with fixed-width regions of the bar rows below
+    # (see generate_Table). str.center() puts the extra space on the right when the
+    # padding is odd, which visibly drifts short labels (e.g. "NVA") left of that
+    # region's true center — bias it left instead so the label lands correctly.
+    pad = max(width - len(text), 0)
+    left = min((pad + 1) // 2 + nudge_right, pad)
+    right = pad - left
+    return " " * left + text + " " * right
 
 class Balance (commands.Cog, DiscordBase):
     def __init__(self, bot):
@@ -26,9 +37,10 @@ class Balance (commands.Cog, DiscordBase):
         self.loop_started = False
     
     def generate_Table(self, categories, data_allies, data_axis, max_value=6):
+        names = get_Faction_Names()
 
         table = "```"
-        table += "  Level   |   Allies  |    Axis\n"
+        table += f"  Level   |{center_Symmetric(names['allies'], 11)}|{center_Symmetric(names['axis'], max_value + 4, nudge_right=1)}\n"
         table += "------------------------------------\n"
 
         
@@ -85,8 +97,9 @@ class Balance (commands.Cog, DiscordBase):
 
             wt.add_field(name="\u200b", value="", inline=False)
 
+            names = get_Faction_Names()
             text = ("```" +
-                    "    Allies: " + str (round (allies_weight, 1)) + " vs. Axis: " + str (round (axis_weight, 1)) + "```")
+                    f"    {names['allies']}: " + str (round (allies_weight, 1)) + f" vs. {names['axis']}: " + str (round (axis_weight, 1)) + "```")
 
             wt.add_field(name="Combat strength", value=text, inline=True)
             wt.add_field(name="\u200b", value="", inline=False)

@@ -41,7 +41,7 @@ class MapRotation (commands.Cog, DiscordBase):
                 url=config.get("rcon", 0, "stats_url")
                 )
 
-            maps.set_image (url=f"{config.get("rcon", 0, "stats_url")}/maps/unknown.webp")
+            maps.set_image (url=f"{config.get("rcon", 0, "stats_url")}/background.webp")
             maps.set_footer(text=f"(Provided by Gryhon)")
             maps.timestamp = datetime.now()
 

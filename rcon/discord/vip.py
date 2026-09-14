@@ -1,14 +1,11 @@
 import discord
 import logging
 import asyncio
-import re
 from datetime import datetime, timezone, timedelta
-from typing import List
-from discord import app_commands
 from discord.ext import commands
 import rcon.rcon as rcon
 from rcon.discord.discordbase import DiscordBase
-from rcon.discord.discordutils import safe_Send, require_Role, verify_And_Register, CommandError
+from rcon.discord.discordutils import safe_Send, has_Allowed_Role, CommandError, is_User_Panel_Dryrun, add_Provided_By, PROVIDED_BY
 from lib.config import config
 
 # get Logger for this module
@@ -71,7 +68,8 @@ class GiftVipConfirmView(discord.ui.View):
                 )
                 embed.add_field(name="Your VIP", value=donor_vip, inline=True)
                 embed.add_field(name=f"{self.recipient_name}'s VIP", value=self.new_recipient_expiry.strftime("%Y-%m-%d"), inline=True)
-                embed.set_footer(text=f"Gifted by {interaction.user.display_name}")
+                embed.set_footer(text=f"Gifted by {interaction.user.display_name} · {PROVIDED_BY}")
+                embed.timestamp = datetime.now()
             else:
                 logger.info(f"DryRun - VIP gift: donor={self.donor_id} → recipient={self.recipient_id} by {interaction.user.name}")
                 donor_vip = "permanent" if self.donor_permanent else self.new_donor_expiry.strftime("%Y-%m-%d")
@@ -82,7 +80,8 @@ class GiftVipConfirmView(discord.ui.View):
                 )
                 embed.add_field(name="Your VIP", value=donor_vip, inline=True)
                 embed.add_field(name=f"{self.recipient_name}'s VIP", value=self.new_recipient_expiry.strftime("%Y-%m-%d"), inline=True)
-                embed.set_footer(text=f"DryRun — no changes made · {interaction.user.display_name}")
+                embed.set_footer(text=f"DryRun — no changes made · {interaction.user.display_name} · {PROVIDED_BY}")
+                embed.timestamp = datetime.now()
 
             await interaction.response.edit_message(embed=embed, view=None)
 
@@ -94,6 +93,38 @@ class GiftVipConfirmView(discord.ui.View):
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.stop()
         await interaction.response.edit_message(content="Gift cancelled.", embed=None, view=None)
+
+
+def build_Vip_Status_View(name: str, expiry, days) -> discord.ui.LayoutView:
+    """Builds the VIP status display as a Components V2 container, matching the look of
+    the rest of the admin/user panels instead of a plain embed."""
+    if expiry is None or days == 0:
+        accent, icon = discord.Color.greyple(), "🎫"
+        body = "No active VIP subscription."
+    elif days == -1:
+        accent, icon = discord.Color.gold(), "👑"
+        body = "**Status:** ✅ Active\n**Expires:** never — permanent VIP"
+    else:
+        expiring_soon = days <= 3
+        accent = discord.Color.orange() if expiring_soon else discord.Color.green()
+        icon = "⏳" if expiring_soon else "✅"
+        body = (
+            "**Status:** ✅ Active\n"
+            f"**Expires:** {expiry.strftime('%Y-%m-%d')}\n"
+            f"**Days remaining:** {days}"
+        )
+        if expiring_soon:
+            body += "\n\n-# ⚠️ Expiring soon."
+
+    container = discord.ui.Container(accent_colour=accent)
+    container.add_item(discord.ui.TextDisplay(f"### {icon} VIP Status — {name}"))
+    container.add_item(discord.ui.Separator())
+    container.add_item(discord.ui.TextDisplay(body))
+
+    add_Provided_By(container)
+    view = discord.ui.LayoutView(timeout=None)
+    view.add_item(container)
+    return view
 
 
 class VipManagement(commands.Cog, DiscordBase):
@@ -111,53 +142,17 @@ class VipManagement(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
             return None
 
-    async def cog_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
-        if isinstance(error, app_commands.CheckFailure):
-            await safe_Send(interaction, f"❌ {error}")
-        else:
-            logger.error(f"Unexpected command error: {error}")
+    # --- VIP status ---
 
-    async def autocomplete_Player_Name(self, current: str) -> List[app_commands.Choice[str]]:
-        """Shared autocomplete logic for player name fields."""
+    async def vip_status(self, interaction: discord.Interaction):
         try:
-            logger.info(f"Autocomplete called with query: {current!r}")
-            multi_array = await asyncio.wait_for(
-                rcon.search_Players(current.replace(" ", "%")),
-                timeout=2.5
-            )
-            if multi_array:
-                logger.info(f"Autocomplete returning {len(multi_array)} result(s)")
-                return [
-                    app_commands.Choice(
-                        name=f"Last: {datetime.fromtimestamp(p[3] / 1000).strftime('%Y-%m-%d')} - {', '.join(p[1])}"[:100],
-                        value=p[0]
-                    )
-                    for p in multi_array
-                ]
-            logger.info("Autocomplete returning no results")
-            return []
-        except asyncio.TimeoutError:
-            logger.warning("Autocomplete timed out — no suggestions returned.")
-            return []
-        except Exception as e:
-            logger.error(f"Unexpected error in autocomplete_Player_Name: {e}", exc_info=True)
-            return []
+            if not has_Allowed_Role(interaction.user, "vip_status"):
+                raise CommandError("You do not have permission for this command.")
 
-    # --- /vip_status ---
-
-    @app_commands.command(name="vip_status", description="Check your VIP status and remaining days")
-    @app_commands.describe(your_ingame_name="Your in-game name — only required if you are not yet registered")
-    @require_Role("vip_management")
-    async def vip_status(self, interaction: discord.Interaction, your_ingame_name: str = None):
-        try:
             player_id, _, _, _, _ = self.select_T17_Voter_Registration(interaction.user.id)
 
             if not player_id:
-                if not your_ingame_name:
-                    raise CommandError("You are not registered. Please provide your in-game name via the `your_ingame_name` field.")
-                if not bool(re.fullmatch(r"[0-9a-fA-F]{32}", your_ingame_name)):
-                    raise CommandError("Invalid in-game name. Please select your name from the autocomplete list.")
-                player_id = your_ingame_name
+                raise CommandError("You are not registered.")
             profile = await self.get_Vip_Profile(player_id)
 
             if not profile:
@@ -167,21 +162,8 @@ class VipManagement(commands.Cog, DiscordBase):
             days = profile.get_Vip_Days_Remaining()
             name = profile.get_Player_Name() or player_id
 
-            if expiry is None or days == 0:
-                embed = discord.Embed(title=f"VIP Status — {name}", color=discord.Color.greyple())
-                embed.add_field(name="Status", value="No active VIP", inline=False)
-            elif days == -1:
-                embed = discord.Embed(title=f"VIP Status — {name}", color=discord.Color.gold())
-                embed.add_field(name="Status", value="Active", inline=True)
-                embed.add_field(name="Expires", value="never (permanent)", inline=True)
-            else:
-                embed = discord.Embed(title=f"VIP Status — {name}", color=discord.Color.green())
-                embed.add_field(name="Status", value="Active", inline=True)
-                embed.add_field(name="Expires", value=expiry.strftime("%Y-%m-%d"), inline=True)
-                embed.add_field(name="Days remaining", value=str(days), inline=True)
-
-            embed.set_footer(text=f"Requested by {interaction.user.display_name}")
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            view = build_Vip_Status_View(name, expiry, days)
+            await interaction.response.send_message(view=view, ephemeral=True)
 
             logger.info(f"VIP status checked by {interaction.user.name} — player_id={player_id} days={days}")
 
@@ -190,33 +172,21 @@ class VipManagement(commands.Cog, DiscordBase):
         except Exception as e:
             logger.error(f"Unexpected error in vip_status: {e}")
 
-    @vip_status.autocomplete("your_ingame_name")
-    async def autocomplete_vip_status_name(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        return await self.autocomplete_Player_Name(current)
+    # --- Gift VIP ---
+    # `recipient` is a player_id already resolved via the shared player-search flow
+    # in the user menu (see userpanel.py) — the caller is always a registered user by the
+    # time this is reachable, since the menu only shows this action to registered users.
 
-    # --- /gift_vip ---
-
-    @app_commands.command(name="gift_vip", description="Gift one VIP day to another player (deducted from your account)")
-    @app_commands.describe(
-        recipient="Choose the recipient's in-game name from the autocomplete list",
-        my_ingame_name="Your in-game name — only required if you are not yet registered"
-    )
-    @require_Role("vip_management")
-    async def gift_vip(self, interaction: discord.Interaction, recipient: str, my_ingame_name: str = None):
-        logger.info(f"gift_vip called by {interaction.user.name} recipient={recipient!r} my_ingame_name={my_ingame_name!r}")
+    async def gift_vip(self, interaction: discord.Interaction, recipient: str):
+        logger.info(f"gift_vip called by {interaction.user.name} recipient={recipient!r}")
         try:
+            if not has_Allowed_Role(interaction.user, "gift_vip"):
+                raise CommandError("You do not have permission for this command.")
+
             player_id, _, _, _, _ = self.select_T17_Voter_Registration(interaction.user.id)
 
             if not player_id:
-                if not my_ingame_name:
-                    raise CommandError("You are not registered. Please provide your in-game name via the `my_ingame_name` field.")
-                if not bool(re.fullmatch(r"[0-9a-fA-F]{32}", my_ingame_name)):
-                    raise CommandError("Invalid in-game name. Please select your name from the autocomplete list.")
-                await verify_And_Register(interaction, my_ingame_name, self, verify_ingame=True)
-                player_id = my_ingame_name
-
-            if not bool(re.fullmatch(r"[0-9a-fA-F]{32}", recipient)):
-                raise CommandError("Invalid recipient. Please select a name from the autocomplete list.")
+                raise CommandError("You are not registered.")
             if recipient == player_id:
                 raise CommandError("You cannot gift VIP to yourself.")
 
@@ -228,7 +198,7 @@ class VipManagement(commands.Cog, DiscordBase):
             donor_expiry = donor_profile.get_Vip_Expiry()
             donor_permanent = donor_days == -1
 
-            if donor_permanent and not config.get("rcon", 0, "discord_commands", 0, "vip_management", 0, "allow_gift_from_permanent", default=False):
+            if donor_permanent and not config.get("rcon", 0, "user_panel", 0, "commands", 0, "vip_management", 0, "allow_gift_from_permanent", default=False):
                 raise CommandError("You have permanent VIP. Gifting from a permanent account is not supported.")
             if not donor_permanent and donor_days <= 1:
                 raise CommandError(f"You only have `{donor_days}` VIP day(s) remaining. You need more than 1 day to gift one.")
@@ -243,7 +213,7 @@ class VipManagement(commands.Cog, DiscordBase):
             base = max(now, recipient_expiry) if recipient_expiry else now
             new_recipient_expiry = base + timedelta(days=1)
 
-            dryrun = config.get("rcon", 0, "discord_commands", 0, "dryrun", default=False)
+            dryrun = is_User_Panel_Dryrun()
 
             donor_vip_after = "permanent" if donor_permanent else new_donor_expiry.strftime("%Y-%m-%d")
             embed = discord.Embed(
@@ -253,7 +223,8 @@ class VipManagement(commands.Cog, DiscordBase):
             )
             embed.add_field(name="Your VIP after", value=donor_vip_after, inline=True)
             embed.add_field(name="Recipient VIP after", value=new_recipient_expiry.strftime("%Y-%m-%d"), inline=True)
-            embed.set_footer(text="DryRun — no changes will be made" if dryrun else "This action cannot be undone.")
+            embed.set_footer(text=f"{'DryRun — no changes will be made' if dryrun else 'This action cannot be undone.'} · {PROVIDED_BY}")
+            embed.timestamp = datetime.now()
 
             view = GiftVipConfirmView(
                 author_id=interaction.user.id,
@@ -272,34 +243,6 @@ class VipManagement(commands.Cog, DiscordBase):
             await safe_Send(interaction, f"❌ {e}")
         except Exception as e:
             logger.error(f"Unexpected error in gift_vip: {e}", exc_info=True)
-
-    @gift_vip.autocomplete("recipient")
-    async def autocomplete_recipient(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        try:
-            logger.info(f"autocomplete_recipient called with query: {current!r}")
-            multi_array = await asyncio.wait_for(
-                rcon.search_Players(current.replace(" ", "%")),
-                timeout=2.5
-            )
-            if multi_array:
-                return [
-                    app_commands.Choice(
-                        name=f"Last: {datetime.fromtimestamp(p[3] / 1000).strftime('%Y-%m-%d')} - {', '.join(p[1])}"[:100],
-                        value=p[0]
-                    )
-                    for p in multi_array
-                ]
-            return []
-        except asyncio.TimeoutError:
-            logger.warning("autocomplete_recipient timed out.")
-            return []
-        except Exception as e:
-            logger.error(f"Unexpected error in autocomplete_recipient: {e}", exc_info=True)
-            return []
-
-    @gift_vip.autocomplete("my_ingame_name")
-    async def autocomplete_my_ingame_name(self, interaction: discord.Interaction, current: str) -> List[app_commands.Choice[str]]:
-        return await self.autocomplete_Player_Name(current)
 
     async def background_Task(self):
         while not self.shutdown_event.is_set():

@@ -213,7 +213,7 @@ class Inappropriate(commands.Cog, DiscordBase):
                 embed.add_field(name="Matched Term", value=f"`{finding}`", inline=True)
                 embed.add_field(name="Score", value=f"`{threshold:.0%}`", inline=True)
                 embed.add_field(name="Player History", value="*(API integration pending)*", inline=False)
-                embed.set_footer(text="Action required")
+                embed.set_footer(text="Action required · (Provided by Gryhon)")
 
                 view = InappropriateView(player_id, name, clan_tag, flagged_value or name, self)
                 msg = await channel.send(embed=embed, view=view)
