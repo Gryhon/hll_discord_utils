@@ -38,6 +38,11 @@ class VoteMap(commands.Cog, DiscordBase):
         self.vote_map_active = True
         self.reset_Vote_Variables() # Reset all variables to default values
         self.shutdown_event = asyncio.Event()
+        # Serializes vote-state changes (self.Maps, vote_msg_id, vote_active, game_start, ...)
+        # across background_task's do_Map_Vote, mapvote_command's pause/resume and the
+        # on_raw_poll_vote_add/remove listeners — these run as independent tasks and used to
+        # race on the same instance attributes.
+        self.vote_lock = asyncio.Lock()
         self.activate_vote = config.get("rcon", 0, "map_vote", 0, "activate_vote")
         self.vote_channel_id = config.get("rcon", 0, "map_vote", 0, "vote_channel_id") 
         self.vote_channel = None   
@@ -736,83 +741,88 @@ class VoteMap(commands.Cog, DiscordBase):
             logger.error(f"Unexpected error: {e}")
    
     async def do_Map_Vote (self):
-        try:
-            self.do_map_vote = True
-            
-            await self.get_Game_State()
-            server_status = await rcon.get_Server_Status()
-            
-            if server_status is not None:
-                if server_status.current_players >= config.get("rcon", 0, "map_vote", 0, "activate_vote") and not self.seeded:
-                    logger.info (f"Server reached {config.get("rcon", 0, "map_vote", 0, "activate_vote")} player and vote map is active!")
-                    self.seeded = True
-                    await self.save_Origin_Map_Rotation ()
+        async with self.vote_lock:
+            try:
+                self.do_map_vote = True
 
-                elif server_status.current_players <= config.get("rcon", 0, "map_vote", 0, "dectivate_vote"):
-                    if self.seeded:
-                        await self.restore_Origin_Map_Rotation ()
-                        logger.info (f"Server drops below or equal to {config.get("rcon", 0, "map_vote", 0, "dectivate_vote")} player and vote map is now deactive!")
+                await self.get_Game_State()
+                server_status = await rcon.get_Server_Status()
 
-                    self.seeded = False
-                    
-            if self.seeded:
-                if self.game_active and not self.vote_active:
-                    logger.info ("Vote is being started...")
-                    
-                    await self.remove_Seeding_Message (True)
-                    await self.start_Vote ()
-                    await self.set_Vote_Result ()
+                if server_status is not None:
+                    if server_status.current_players >= config.get("rcon", 0, "map_vote", 0, "activate_vote") and not self.seeded:
+                        logger.info (f"Server reached {config.get("rcon", 0, "map_vote", 0, "activate_vote")} player and vote map is active!")
+                        self.seeded = True
+                        await self.save_Origin_Map_Rotation ()
 
-                    self.last_execution = time.time()
-                    self.reminder_count = 0
+                    elif server_status.current_players <= config.get("rcon", 0, "map_vote", 0, "dectivate_vote"):
+                        if self.seeded:
+                            await self.restore_Origin_Map_Rotation ()
+                            logger.info (f"Server drops below or equal to {config.get("rcon", 0, "map_vote", 0, "dectivate_vote")} player and vote map is now deactive!")
 
-                # stop vote
-                elif not self.game_active and self.vote_active:
-                    logger.info ("Game over vote is being stopped...")
+                        self.seeded = False
 
-                    await self.create_Audit_Log_Message ()
-                    await self.stop_Vote ()
-                    self.vote_active = False
-                    self.last_execution = None
+                if self.seeded:
+                    if self.game_active and not self.vote_active:
+                        logger.info ("Vote is being started...")
 
-                # reminder
-                elif self.game_active and self.vote_active:
-                    reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0) * 60
-                    max_reminders = config.get("rcon", 0, "map_vote", 0, "max_reminders_per_game", default=0)
-                    
-                    if not self.last_execution:
-                        self.last_execution = time.time()
-                        logger.debug("Initializing last execution time")
+                        await self.remove_Seeding_Message (True)
+                        await self.start_Vote ()
 
-                    current_time = time.time()
-                    time_since_last = (current_time - self.last_execution)
+                        if self.vote_active:
+                            await self.set_Vote_Result ()
 
-                    if time_since_last >= reminder_interval and (max_reminders == 0 or self.reminder_count < max_reminders):
-                        logger.info(f"Sending reminder {self.reminder_count + 1} / {max_reminders if max_reminders > 0 else 'unlimited'}")
-                        if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", False):
-                            await self.send_Vote_Message(True)
-                            self.reminder_count += 1
-                            logger.info(f"Reminder sent successfully. Next reminder in {int (reminder_interval / 60)} minutes")
-                        self.last_execution = current_time
-                    else:
-                        logger.debug(f"Not time for reminder yet. {int ((reminder_interval - time_since_last) / 60)} minutes remaining")
+                            self.last_execution = time.time()
+                            self.reminder_count = 0
+                        else:
+                            logger.warning ("start_Vote did not produce an active vote — skipping set_Vote_Result this tick.")
 
-                if not self.send_seeding_message:
-                    self.send_seeding_message = True
+                    # stop vote
+                    elif not self.game_active and self.vote_active:
+                        logger.info ("Game over vote is being stopped...")
 
-            else:
-                if self.send_seeding_message:
-                    await self.clear_All_Messages ()
-                    await self.send_Seeding_Message ()
+                        await self.create_Audit_Log_Message ()
+                        await self.stop_Vote ()
+                        self.vote_active = False
+                        self.last_execution = None
 
-                    self.vote_active = False
-                    self.send_seeding_message = False
+                    # reminder
+                    elif self.game_active and self.vote_active:
+                        reminder_interval = config.get("rcon", 0, "map_vote", 0, "reminder", default=0) * 60
+                        max_reminders = config.get("rcon", 0, "map_vote", 0, "max_reminders_per_game", default=0)
 
-            self.do_map_vote = False
-            
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            self.do_map_vote = False
+                        if not self.last_execution:
+                            self.last_execution = time.time()
+                            logger.debug("Initializing last execution time")
+
+                        current_time = time.time()
+                        time_since_last = (current_time - self.last_execution)
+
+                        if time_since_last >= reminder_interval and (max_reminders == 0 or self.reminder_count < max_reminders):
+                            logger.info(f"Sending reminder {self.reminder_count + 1} / {max_reminders if max_reminders > 0 else 'unlimited'}")
+                            if not config.get("rcon", 0, "map_vote", 0, "stealth_vote", False):
+                                await self.send_Vote_Message(True)
+                                self.reminder_count += 1
+                                logger.info(f"Reminder sent successfully. Next reminder in {int (reminder_interval / 60)} minutes")
+                            self.last_execution = current_time
+                        else:
+                            logger.debug(f"Not time for reminder yet. {int ((reminder_interval - time_since_last) / 60)} minutes remaining")
+
+                    if not self.send_seeding_message:
+                        self.send_seeding_message = True
+
+                else:
+                    if self.send_seeding_message:
+                        await self.clear_All_Messages ()
+                        await self.send_Seeding_Message ()
+
+                        self.vote_active = False
+                        self.send_seeding_message = False
+
+                self.do_map_vote = False
+
+            except Exception as e:
+                logger.error(f"Unexpected error: {e}")
+                self.do_map_vote = False
     
     async def generate_Schedule_Log (self, schedule):
         try:
@@ -879,21 +889,22 @@ class VoteMap(commands.Cog, DiscordBase):
                         
                     while self.do_map_vote == True:
                         logger.info ("Method do_Map_Vote () is in execution")
-                        await asyncio.sleep (1)   
+                        await asyncio.sleep (1)
 
-                    if self.seeded:
-                        await self.stop_Vote ()
-                        await self.restore_Origin_Map_Rotation ()
+                    async with self.vote_lock:
+                        if self.seeded:
+                            await self.stop_Vote ()
+                            await self.restore_Origin_Map_Rotation ()
 
-                    await self.clear_All_Messages (None, False)
-                    window = self.scheduler_messager.get_current_window_times ()
+                        await self.clear_All_Messages (None, False)
+                        window = self.scheduler_messager.get_current_window_times ()
 
-                    off_ts = self._time_to_discord_ts(window[0])
-                    on_ts  = self._time_to_discord_ts(window[1], must_be_future=True)
+                        off_ts = self._time_to_discord_ts(window[0])
+                        on_ts  = self._time_to_discord_ts(window[1], must_be_future=True)
 
-                    await self.send_Pause_Message (off_ts=off_ts, on_ts=on_ts)
+                        await self.send_Pause_Message (off_ts=off_ts, on_ts=on_ts)
 
-                    self.reset_Vote_Variables()
+                        self.reset_Vote_Variables()
 
                 elif not paused and (self.admin_overrule == Status.RESUME or not self.vote_map_active):
                     self.vote_map_active = True
@@ -949,16 +960,17 @@ class VoteMap(commands.Cog, DiscordBase):
             
             while self.do_map_vote == True:
                 logger.info ("Method do_Map_Vote () is in execution")
-                await asyncio.sleep (1)   
+                await asyncio.sleep (1)
 
-            if self.seeded:
-                await self.stop_Vote ()
-                await self.restore_Origin_Map_Rotation ()
+            async with self.vote_lock:
+                if self.seeded:
+                    await self.stop_Vote ()
+                    await self.restore_Origin_Map_Rotation ()
 
-            await self.clear_All_Messages (None, False)
-            await self.send_Pause_Message ()
+                await self.clear_All_Messages (None, False)
+                await self.send_Pause_Message ()
 
-            self.reset_Vote_Variables()
+                self.reset_Vote_Variables()
 
         elif action == "pause" and not self.vote_map_active:
             self.admin_overrule = Status.PAUSE
@@ -998,16 +1010,16 @@ class VoteMap(commands.Cog, DiscordBase):
     @commands.Cog.listener()
     async def on_raw_poll_vote_add(self, payload):
         try:
-            
-            if (self.vote_msg_id == payload.message_id) and (self.game_active and self.vote_active):
-                answer = payload.answer_id
-                voter = await self.bot.fetch_user(payload.user_id)
+            async with self.vote_lock:
+                if (self.vote_msg_id == payload.message_id) and (self.game_active and self.vote_active):
+                    answer = payload.answer_id
+                    voter = await self.bot.fetch_user(payload.user_id)
 
-                logger.info (voter.name + " voted for " + self.vote_msg.poll.answers[answer-1].text)
-                self.insert_Voter (self.game_start, voter.name, voter.id, self.vote_msg.poll.answers[answer-1].text)
+                    logger.info (voter.name + " voted for " + self.vote_msg.poll.answers[answer-1].text)
+                    self.insert_Voter (self.game_start, voter.name, voter.id, self.vote_msg.poll.answers[answer-1].text)
 
-                await self.set_Vote_Result ()
-        
+                    await self.set_Vote_Result ()
+
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
 
@@ -1017,14 +1029,15 @@ class VoteMap(commands.Cog, DiscordBase):
     @commands.Cog.listener()
     async def on_raw_poll_vote_remove(self, payload):
         try:
-            if (self.vote_msg_id == payload.message_id) and (self.game_active and self.vote_active):
-                answer = payload.answer_id
-                name = await self.get_User_Name (payload.user_id)
+            async with self.vote_lock:
+                if (self.vote_msg_id == payload.message_id) and (self.game_active and self.vote_active):
+                    answer = payload.answer_id
+                    name = await self.get_User_Name (payload.user_id)
 
-                logger.info (name + " removed vote for " + self.vote_msg.poll.answers[answer-1].text)
-                self.deleter_Voter (self.game_start, name, self.vote_msg.poll.answers[answer-1].text)
-                
-                await self.set_Vote_Result ()
+                    logger.info (name + " removed vote for " + self.vote_msg.poll.answers[answer-1].text)
+                    self.deleter_Voter (self.game_start, name, self.vote_msg.poll.answers[answer-1].text)
+
+                    await self.set_Vote_Result ()
 
         except Exception as e:
             logger.error(f"Unexpected error: {e}")
